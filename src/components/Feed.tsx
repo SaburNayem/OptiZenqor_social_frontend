@@ -1,63 +1,88 @@
-import { useState } from 'react';
+import { CommunityView, FeedPostView, JobView, ReelView, StoryView } from '../types';
+import CommunitiesPanel from './CommunitiesPanel';
+import Composer from './Composer';
+import JobsPanel from './JobsPanel';
 import PostCard from './PostCard';
-import { Post } from '../types';
+import ReelsStrip from './ReelsStrip';
+import StoriesRow from './StoriesRow';
 
-const mockPosts: Post[] = [
-  {
-    id: '1',
-    user: {
-      id: '1',
-      name: 'John Doe',
-      username: 'johndoe',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      bio: 'Full Stack Developer'
-    },
-    content: 'Just deployed my new social media app! 🚀 Built with React, Tailwind, and Vite. Check it out!',
-    likes: 128,
-    comments: 24,
-    createdAt: new Date('2024-01-15')
-  },
-  {
-    id: '2',
-    user: {
-      id: '2',
-      name: 'Jane Smith',
-      username: 'janesmith',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      bio: 'UI/UX Designer'
-    },
-    content: 'Loving the new dark mode toggle! So smooth and beautiful design. Great work team! 👏',
-    likes: 89,
-    comments: 12,
-    createdAt: new Date('2024-01-14')
-  },
-];
+interface FeedProps {
+  stories: StoryView[];
+  posts: FeedPostView[];
+  reels: ReelView[];
+  jobs: JobView[];
+  communities: CommunityView[];
+  composerValue: string;
+  onComposerChange: (value: string) => void;
+  onCreatePost: () => void;
+  canCreatePost: boolean;
+  isCreatingPost: boolean;
+  createPostError: string | null;
+  onJoinCommunity: (id: string) => void;
+  canJoinCommunity: boolean;
+  joiningCommunityId: string | null;
+}
 
-const Feed = () => {
-  const [posts] = useState(mockPosts);
-
+const Feed = ({
+  stories,
+  posts,
+  reels,
+  jobs,
+  communities,
+  composerValue,
+  onComposerChange,
+  onCreatePost,
+  canCreatePost,
+  isCreatingPost,
+  createPostError,
+  onJoinCommunity,
+  canJoinCommunity,
+  joiningCommunityId,
+}: FeedProps) => {
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-8 p-6 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-        <textarea 
-          placeholder="What's happening?"
-          className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[120px]"
-        />
-        <div className="flex justify-end pt-4">
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-semibold transition-colors">
-            Post
-          </button>
+    <main className="space-y-6">
+      <StoriesRow stories={stories} />
+      <Composer
+        value={composerValue}
+        onChange={onComposerChange}
+        onSubmit={onCreatePost}
+        disabled={!canCreatePost || isCreatingPost || !composerValue.trim()}
+        isAuthenticated={canCreatePost}
+        isSubmitting={isCreatingPost}
+        error={createPostError}
+      />
+      <section className="panel-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="section-kicker">Unified Feed</p>
+            <h2 className="section-title mt-1">Responsive social timeline powered by live APIs</h2>
+          </div>
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {posts.length} live posts
+          </div>
         </div>
-      </div>
+      </section>
 
       <div className="space-y-6">
-        {posts.map(post => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        {posts.length > 0 ? (
+          posts.map((post) => <PostCard key={post.id} post={post} />)
+        ) : (
+          <section className="panel-surface text-sm text-slate-500">
+            No feed items were returned by `/feed`.
+          </section>
+        )}
       </div>
-    </div>
+
+      <ReelsStrip reels={reels} />
+      <JobsPanel jobs={jobs} />
+      <CommunitiesPanel
+        communities={communities}
+        canJoin={canJoinCommunity}
+        joiningId={joiningCommunityId}
+        onJoin={onJoinCommunity}
+      />
+    </main>
   );
 };
 
 export default Feed;
-

@@ -1,0 +1,452 @@
+import {
+  CommunityView,
+  DashboardData,
+  FeedPostView,
+  JobView,
+  NotificationView,
+  ReelView,
+  SearchItemView,
+  SessionState,
+  StoryView,
+  TrendView,
+  ViewerUser,
+} from '../types';
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(
+  /\/+$/,
+  '',
+);
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function asText(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function capitalize(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function formatRelative(iso: string) {
+  if (!iso) {
+    return 'Just now';
+  }
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+
+  const seconds = Math.max(1, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+  return date.toLocaleDateString();
+}
+
+function pickList(payload: unknown, aliases: string[] = []) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (!isRecord(payload)) {
+    return [];
+  }
+
+  const candidates = [
+    payload.data,
+    payload.items,
+    payload.results,
+    payload.posts,
+    payload.stories,
+    payload.reels,
+    payload.jobs,
+    payload.communities,
+    payload.notifications,
+    ...aliases.map((alias) => payload[alias]),
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+    if (isRecord(candidate)) {
+      for (const alias of aliases) {
+        if (Array.isArray(candidate[alias])) {
+          return candidate[alias] as unknown[];
+        }
+      }
+      for (const key of ['items', 'results', 'posts', 'stories', 'reels', 'jobs', 'communities']) {
+        if (Array.isArray(candidate[key])) {
+          return candidate[key] as unknown[];
+        }
+      }
+    }
+  }
+
+  return [];
+}
+
+function pickObject(payload: unknown) {
+  if (!isRecord(payload)) {
+    return {};
+  }
+  return isRecord(payload.data) ? payload.data : payload;
+}
+
+async function request(path: string, init: RequestInit = {}, token?: string) {
+  const headers = new Headers(init.headers);
+  headers.set('Accept', 'application/json');
+
+  if (!(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+  });
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const body = contentType.includes('application/json')
+    ? await response.json().catch(() => null)
+    : await response.text().catch(() => '');
+
+  if (!response.ok) {
+    const message =
+      (isRecord(body) && typeof body.message === 'string' && body.message) ||
+      (typeof body === 'string' && body) ||
+      `Request failed with ${response.status}`;
+    throw new Error(message);
+  }
+
+  return body;
+}
+
+function normalizeUser(raw: unknown): ViewerUser {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id, `user-${Math.random().toString(36).slice(2, 8)}`),
+    name: asText(record.name, 'Unknown User'),
+    username: asText(record.username, 'guest'),
+    email: asText(record.email),
+    avatar:
+      asText(record.avatar) ||
+      asText(record.avatarUrl) ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(asText(record.name, 'User'))}&background=0f172a&color=ffffff`,
+    bio: asText(record.bio),
+    role: capitalize(asText(record.role, 'user')),
+    verified: Boolean(record.verified),
+    followers: asNumber(record.followers),
+    following: asNumber(record.following),
+  };
+}
+
+function inferNetwork(post: JsonRecord, user: ViewerUser): FeedPostView['network'] {
+  const tags = toArray(post.tags);
+  if (toArray(post.media).length > 0) {
+    return 'instagram';
+  }
+  if (user.role.toLowerCase().includes('business') || user.role.toLowerCase().includes('recruiter')) {
+    return 'linkedin';
+  }
+  if (tags.length > 1 || asNumber(post.comments) > 8) {
+    return 'facebook';
+  }
+  return 'x';
+}
+
+function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPostView {
+  const record = isRecord(raw) ? raw : {};
+  const author = isRecord(record.author) ? normalizeUser(record.author) : usersById.get(asText(record.authorId));
+  const user = author ?? {
+    id: asText(record.authorId, 'unknown'),
+    name: 'Unknown User',
+    username: 'unknown',
+    avatar: `https://ui-avatars.com/api/?name=Unknown&background=334155&color=ffffff`,
+    bio: '',
+    role: 'User',
+    verified: false,
+  };
+  const media = toArray(record.media).find((item) => typeof item === 'string');
+  return {
+    id: asText(record.id),
+    network: inferNetwork(record, user),
+    user,
+    headline: capitalize(asText(record.type, 'post')),
+    content: asText(record.caption),
+    image: typeof media === 'string' ? media : undefined,
+    likes: asNumber(record.likes),
+    comments: asNumber(record.comments),
+    shares: asNumber(record.shares),
+    views: asNumber(record.views),
+    createdAt: formatRelative(asText(record.createdAt)),
+    tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
+  };
+}
+
+function normalizeStory(raw: unknown, usersById: Map<string, ViewerUser>, index: number): StoryView {
+  const record = isRecord(raw) ? raw : {};
+  const user = usersById.get(asText(record.userId)) ?? {
+    id: asText(record.userId, `story-user-${index}`),
+    name: `Creator ${index + 1}`,
+    username: `creator${index + 1}`,
+    avatar: `https://ui-avatars.com/api/?name=Creator+${index + 1}&background=1d9bf0&color=ffffff`,
+    bio: '',
+    role: 'Creator',
+    verified: false,
+  };
+
+  const accents = [
+    'from-[#ff6a88] via-[#ff8c42] to-[#ffd166]',
+    'from-[#1d9bf0] via-[#2ec4b6] to-[#90f1ef]',
+    'from-[#0a66c2] via-[#2b7fff] to-[#74b9ff]',
+    'from-[#1877f2] via-[#6c63ff] to-[#b388ff]',
+  ];
+
+  return {
+    id: asText(record.id, `story-${index}`),
+    title: user.name,
+    subtitle: asText(record.text, 'Story update').slice(0, 40) || 'Fresh story',
+    accent: accents[index % accents.length],
+    media: asText(record.media),
+    user,
+  };
+}
+
+function normalizeReel(raw: unknown): ReelView {
+  const record = isRecord(raw) ? raw : {};
+  const user = isRecord(record.author) ? normalizeUser(record.author) : normalizeUser({});
+  return {
+    id: asText(record.id),
+    caption: asText(record.caption, 'Untitled reel'),
+    thumbnail:
+      asText(record.thumbnail) ||
+      'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=80',
+    audioName: asText(record.audioName, 'Original audio'),
+    likes: asNumber(record.likes),
+    comments: asNumber(record.comments),
+    shares: asNumber(record.shares),
+    createdAt: formatRelative(asText(record.createdAt)),
+    user,
+  };
+}
+
+function normalizeJob(raw: unknown): JobView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    title: asText(record.title, 'Open role'),
+    company: asText(record.companyName) || asText(record.company, 'Confidential'),
+    location: asText(record.location, 'Remote'),
+    type: capitalize(asText(record.type, 'remote')),
+    salary: asText(record.salaryLabel) || asText(record.salary, 'Compensation not listed'),
+    postedTime: asText(record.postedTime) || formatRelative(asText(record.createdAt)),
+    skills: toArray(record.skills).filter((item): item is string => typeof item === 'string'),
+    featured: Boolean(record.featured),
+    saved: Boolean(record.saved),
+    applied: Boolean(record.applied),
+  };
+}
+
+function normalizeCommunity(raw: unknown): CommunityView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    name: asText(record.name, 'Community'),
+    description: asText(record.description, 'No description yet.'),
+    category: asText(record.category, 'General'),
+    privacy: capitalize(asText(record.privacy, 'public')),
+    location: asText(record.location, 'Global'),
+    memberCount: asNumber(record.memberCount),
+    tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
+  };
+}
+
+function normalizeTrend(raw: unknown): TrendView {
+  const record = isRecord(raw) ? raw : {};
+  const payload = isRecord(record.payload) ? record.payload : {};
+  return {
+    id: asText(record.id) || asText(payload.id) || asText(record.title),
+    topic: `#${asText(record.title, 'Trending').replace(/^#/, '').replace(/\s+/g, '')}`,
+    detail:
+      asText(payload.description) ||
+      asText(payload.caption) ||
+      `${capitalize(asText(record.type, 'item'))} is performing strongly right now.`,
+    volume: `${Math.max(1, Math.round(asNumber(record.score, 1)))} trend score`,
+  };
+}
+
+function normalizeNotification(raw: unknown): NotificationView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    title: asText(record.title, 'New activity'),
+    body: asText(record.body, 'Something changed in your network.'),
+    createdAt: formatRelative(asText(record.createdAt)),
+    unread: Boolean(record.unread),
+    entityType: asText(record.entityType),
+    actorName: asText(record.actorName),
+  };
+}
+
+function normalizeSearchItem(raw: unknown): SearchItemView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    type: asText(record.type, 'result'),
+    title: asText(record.title, 'Untitled'),
+    subtitle: asText(record.description) || asText(record.caption) || asText(record.name),
+    image: asText(record.imageUrl) || asText(record.avatar),
+  };
+}
+
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
+
+export async function login(email: string, password: string) {
+  const payload = await request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+  const record = pickObject(payload);
+  return {
+    accessToken: asText((payload as JsonRecord).accessToken) || asText(record.accessToken),
+    refreshToken: asText((payload as JsonRecord).refreshToken) || asText(record.refreshToken),
+    sessionId: asText((payload as JsonRecord).sessionId) || asText(record.sessionId),
+    user: normalizeUser((payload as JsonRecord).user ?? record.user ?? record),
+  } satisfies SessionState;
+}
+
+export async function fetchMe(token: string) {
+  const payload = await request('/auth/me', {}, token);
+  return normalizeUser((payload as JsonRecord).user ?? (payload as JsonRecord).data ?? payload);
+}
+
+export async function createPost(input: { caption: string; tags: string[] }, token: string) {
+  const payload = await request(
+    '/posts',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        caption: input.caption,
+        media: [],
+        tags: input.tags,
+      }),
+    },
+    token,
+  );
+  return payload;
+}
+
+export async function joinCommunity(id: string, token: string) {
+  return request(
+    `/communities/${id}/join`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function markNotificationRead(id: string, token: string) {
+  return request(
+    `/notifications/${id}/read`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function fetchDashboard(token?: string, searchQuery?: string) {
+  const [usersPayload, feedPayload, storiesPayload, reelsPayload, jobsPayload, communitiesPayload, trendingPayload, notificationsPayload, searchPayload] =
+    await Promise.all([
+      request('/users'),
+      request('/feed'),
+      request('/stories'),
+      request('/reels'),
+      request('/jobs-networking', {}, token),
+      request('/communities'),
+      request('/trending'),
+      request('/notifications', {}, token),
+      searchQuery?.trim()
+        ? request(`/search-discovery?q=${encodeURIComponent(searchQuery.trim())}&limit=8`)
+        : Promise.resolve({ results: [] }),
+    ]);
+
+  const users = pickList(usersPayload).map(normalizeUser);
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  const posts = pickList(feedPayload, ['posts']).map((item) => normalizePost(item, usersById));
+  const stories = pickList(storiesPayload, ['stories']).map((item, index) =>
+    normalizeStory(item, usersById, index),
+  );
+  const reels = pickList(reelsPayload, ['reels']).map(normalizeReel);
+
+  const jobsSource = isRecord(jobsPayload) ? jobsPayload : {};
+  const jobs = pickList(jobsSource, ['jobs']).map(normalizeJob);
+
+  const communitiesSource = isRecord(communitiesPayload) ? communitiesPayload : {};
+  const communities = pickList(communitiesSource, ['communities']).map(normalizeCommunity);
+
+  const trends = pickList(trendingPayload).map(normalizeTrend);
+
+  const notificationsObject = pickObject(notificationsPayload);
+  const notifications = pickList(notificationsObject, ['notifications', 'inbox']).map(
+    normalizeNotification,
+  );
+
+  const searchObject = pickObject(searchPayload);
+  const search = pickList(searchObject, ['results', 'items']).map(normalizeSearchItem);
+
+  return {
+    userSuggestions: users.slice(0, 6),
+    stories,
+    posts,
+    reels,
+    jobs: jobs.slice(0, 6),
+    communities: communities.slice(0, 6),
+    trends: trends.slice(0, 6),
+    notifications: notifications.slice(0, 6),
+    search: search.slice(0, 8),
+    stats: {
+      posts: posts.length,
+      stories: stories.length,
+      reels: reels.length,
+      communities: communities.length,
+      jobs: jobs.length,
+      notifications: notifications.length,
+    },
+  } satisfies DashboardData;
+}
