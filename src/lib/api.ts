@@ -1,4 +1,6 @@
 import {
+  ChatThread,
+  ConnectionItem,
   CommunityView,
   DashboardData,
   FeedPostView,
@@ -7,8 +9,10 @@ import {
   ReelView,
   SearchItemView,
   SessionState,
+  SettingsGroup,
   StoryView,
   TrendView,
+  UserProfile,
   ViewerUser,
 } from '../types';
 
@@ -328,6 +332,194 @@ function normalizeSearchItem(raw: unknown): SearchItemView {
   };
 }
 
+function firstBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = firstBoolean(item);
+      if (nested !== null) {
+        return nested;
+      }
+    }
+    return null;
+  }
+  if (isRecord(value)) {
+    for (const nestedValue of Object.values(value)) {
+      const nested = firstBoolean(nestedValue);
+      if (nested !== null) {
+        return nested;
+      }
+    }
+  }
+  return null;
+}
+
+function formatChatTime(iso: string) {
+  if (!iso) {
+    return 'Now';
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function normalizeProfile(raw: unknown, fallbackUser?: ViewerUser): UserProfile {
+  const record = pickObject(raw);
+  const user = normalizeUser((record as JsonRecord).user ?? fallbackUser ?? {});
+  const stats = isRecord((record as JsonRecord).stats) ? ((record as JsonRecord).stats as JsonRecord) : {};
+  const recentPosts = pickList(record, ['recentPosts']).length;
+
+  return {
+    user,
+    coverImage:
+      user.coverImage ||
+      asText((record as JsonRecord).coverImage) ||
+      'https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1600&q=80',
+    headline: user.headline || asText((record as JsonRecord).headline) || user.bio || 'Profile overview',
+    about: user.bio || asText((record as JsonRecord).about) || 'No bio added yet.',
+    location: user.location || 'Global',
+    website: user.website || '',
+    joinedLabel: asText((record as JsonRecord).joinedLabel, 'Joined recently'),
+    skills: toArray((record as JsonRecord).skills).filter((item): item is string => typeof item === 'string'),
+    metrics: [
+      { label: 'Followers', value: String(asNumber(stats.followers, user.followers ?? 0)) },
+      { label: 'Following', value: String(asNumber(stats.following, user.following ?? 0)) },
+      { label: 'Posts', value: String(asNumber(stats.posts, recentPosts)) },
+      { label: 'Verified', value: user.verified ? 'Yes' : 'No' },
+    ],
+    highlights: [
+      {
+        id: 'profile-role',
+        label: 'Role',
+        value: user.role,
+        description: 'Current role returned from the profile backend.',
+      },
+      {
+        id: 'profile-preview',
+        label: 'Public profile',
+        value: `@${user.username}`,
+        description: 'Your live backend profile identity.',
+      },
+      {
+        id: 'profile-bio',
+        label: 'Bio',
+        value: user.bio || 'No bio yet',
+        description: 'Profile summary visible in the app.',
+      },
+    ],
+  };
+}
+
+function normalizeConnection(raw: unknown, relationship: ConnectionItem['relationship']): ConnectionItem {
+  const user = normalizeUser(raw);
+  return {
+    id: `connection-${relationship}-${user.id}`,
+    user,
+    relationship,
+    note: user.bio || `${user.role} in your Socity network.`,
+    sharedTags: [user.role, user.location || 'Global'].filter(Boolean),
+  };
+}
+
+function normalizeSettings(raw: unknown): SettingsGroup[] {
+  return pickList(raw).map((section) => {
+    const record = isRecord(section) ? section : {};
+    const items = pickList(record, ['items']).map((item) => {
+      const itemRecord = isRecord(item) ? item : {};
+      return {
+        id: asText(itemRecord.key) || asText(itemRecord.id),
+        title: asText(itemRecord.title, 'Setting'),
+        description: asText(itemRecord.subtitle) || asText((itemRecord.data as JsonRecord | undefined)?.description),
+        enabled: firstBoolean((itemRecord.data as JsonRecord | undefined)?.state ?? itemRecord.data) ?? false,
+      };
+    });
+
+    return {
+      id: asText(record.key) || asText(record.id),
+      title: asText(record.title, 'Settings'),
+      items,
+    };
+  });
+}
+
+function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]): ChatThread {
+  const record = isRecord(raw) ? raw : {};
+  const participants = pickList(record, ['participants']).map(normalizeUser);
+  const participant =
+    participants.find((item) => item.id !== viewerId) ??
+    participants[0] ??
+    normalizeUser({});
+  const normalizedMessages = messages
+    .map((message) => (isRecord(message) ? message : {}))
+    .map((message) => ({
+      id: asText(message.id),
+      authorId: asText(message.senderId),
+      body: asText(message.text),
+      createdAt: formatChatTime(asText(message.timestamp)),
+      status: asText(message.deliveryState) === 'read' ? ('seen' as const) : ('sent' as const),
+    }));
+  const lastMessage = normalizedMessages[normalizedMessages.length - 1];
+
+  return {
+    id: asText(record.id),
+    participant,
+    roleLabel: participant.role || asText(record.participantsLabel, 'Conversation'),
+    preview: lastMessage?.body || asText((record.lastMessage as JsonRecord | undefined)?.text) || asText(record.summary),
+    unreadCount: asNumber(record.unreadCount),
+    lastActive: lastMessage?.createdAt || 'Now',
+    online: false,
+    messages: normalizedMessages,
+  };
+}
+
+function deriveExplore(search: SearchItemView[], trends: TrendView[], jobs: JobView[], communities: CommunityView[]) {
+  const searchClusters = search.slice(0, 3).map((item, index) => ({
+    id: `explore-${item.id}`,
+    title: item.title,
+    description: item.subtitle || `${capitalize(item.type)} surfaced by live search.`,
+    image:
+      item.image ||
+      [
+        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
+      ][index % 3],
+    stat: capitalize(item.type),
+  }));
+
+  if (searchClusters.length > 0) {
+    return searchClusters;
+  }
+
+  return [
+    ...trends.slice(0, 1).map((trend) => ({
+      id: `explore-trend-${trend.id}`,
+      title: trend.topic,
+      description: trend.detail,
+      image: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1200&q=80',
+      stat: trend.volume,
+    })),
+    ...jobs.slice(0, 1).map((job) => ({
+      id: `explore-job-${job.id}`,
+      title: job.title,
+      description: `${job.company} • ${job.location}`,
+      image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+      stat: job.type,
+    })),
+    ...communities.slice(0, 1).map((community) => ({
+      id: `explore-community-${community.id}`,
+      title: community.name,
+      description: community.description,
+      image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
+      stat: `${community.memberCount} members`,
+    })),
+  ];
+}
+
 export function getApiBaseUrl() {
   return API_BASE_URL;
 }
@@ -349,6 +541,39 @@ export async function login(email: string, password: string) {
 export async function fetchMe(token: string) {
   const payload = await request('/auth/me', {}, token);
   return normalizeUser((payload as JsonRecord).user ?? (payload as JsonRecord).data ?? payload);
+}
+
+export async function signup(input: { name: string; email: string; password: string }) {
+  const username = input.name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '') || `user.${Date.now()}`;
+  const payload = await request('/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.name.trim(),
+      username,
+      email: input.email.trim(),
+      password: input.password,
+      confirmPassword: input.password,
+      profileType: 'user',
+    }),
+  });
+  const record = pickObject(payload);
+  return {
+    accessToken: asText((payload as JsonRecord).accessToken) || asText(record.accessToken),
+    refreshToken: asText((payload as JsonRecord).refreshToken) || asText(record.refreshToken),
+    sessionId: asText((payload as JsonRecord).sessionId) || asText(record.sessionId),
+    user: normalizeUser((payload as JsonRecord).user ?? record.user ?? record),
+  } satisfies SessionState;
+}
+
+export async function forgotPassword(email: string) {
+  return request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email: email.trim() }),
+  });
 }
 
 export async function createPost(input: { caption: string; tags: string[] }, token: string) {
@@ -387,6 +612,92 @@ export async function markNotificationRead(id: string, token: string) {
     },
     token,
   );
+}
+
+export async function fetchProfile(token: string) {
+  const payload = await request('/profile', {}, token);
+  return normalizeProfile(payload);
+}
+
+export async function updateProfile(
+  input: {
+    name?: string;
+    headline?: string;
+    location?: string;
+    website?: string;
+    about?: string;
+  },
+  token: string,
+) {
+  return request(
+    '/user-profile/edit',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: input.name,
+        bio: input.about,
+        location: input.location,
+        website: input.website,
+      }),
+    },
+    token,
+  );
+}
+
+export async function fetchConnections(token: string) {
+  const [followersPayload, followingPayload] = await Promise.all([
+    request('/user-profile/followers', {}, token),
+    request('/user-profile/following', {}, token),
+  ]);
+
+  const followers = pickList(followersPayload).map((item) => normalizeConnection(item, 'mentor'));
+  const following = pickList(followingPayload).map((item) =>
+    normalizeConnection(item, 'following'),
+  );
+  const merged = [...followers, ...following];
+  const unique = new Map(merged.map((item) => [item.user.id, item]));
+  return [...unique.values()];
+}
+
+export async function toggleFollowUser(id: string, shouldFollow: boolean, token: string) {
+  return request(
+    `/users/${id}/${shouldFollow ? 'follow' : 'unfollow'}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function fetchChatThreads(token: string, viewerId: string) {
+  const payload = await request('/chat/threads', {}, token);
+  const threads = pickList(payload, ['threads']);
+  const withMessages = await Promise.all(
+    threads.map(async (thread) => {
+      const id = asText((thread as JsonRecord).id);
+      const messagesPayload = await request(`/chat/threads/${id}/messages`, {}, token);
+      const messages = pickList(messagesPayload, ['messages']);
+      return normalizeChatThread(thread, viewerId, messages);
+    }),
+  );
+  return withMessages;
+}
+
+export async function sendThreadMessage(threadId: string, text: string, token: string) {
+  return request(
+    `/chat/threads/${threadId}/messages`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    },
+    token,
+  );
+}
+
+export async function fetchSettings(token: string) {
+  const payload = await request('/settings', {}, token);
+  return normalizeSettings(payload);
 }
 
 export async function fetchDashboard(token?: string, searchQuery?: string) {
@@ -449,4 +760,13 @@ export async function fetchDashboard(token?: string, searchQuery?: string) {
       notifications: notifications.length,
     },
   } satisfies DashboardData;
+}
+
+export function buildExploreClusters(data: {
+  search: SearchItemView[];
+  trends: TrendView[];
+  jobs: JobView[];
+  communities: CommunityView[];
+}) {
+  return deriveExplore(data.search, data.trends, data.jobs, data.communities);
 }

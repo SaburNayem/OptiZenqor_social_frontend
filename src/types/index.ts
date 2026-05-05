@@ -270,6 +270,7 @@ export interface SocialAppData {
   profile: UserProfile;
   jobs: JobView[];
   communities: CommunityView[];
+  settings: SettingsGroup[];
 }
 
 export interface AuthResult {

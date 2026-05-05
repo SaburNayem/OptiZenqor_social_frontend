@@ -14,6 +14,7 @@ import {
   TrendItem,
   UserProfile,
   ViewerUser,
+  SettingsGroup,
 } from '../types';
 import { createId } from '../lib/utils';
 
@@ -547,6 +548,41 @@ function createCommunities(): CommunityView[] {
   ];
 }
 
+function createSettings(): SettingsGroup[] {
+  return [
+    {
+      id: 'appearance',
+      title: 'Appearance',
+      items: [
+        {
+          id: 'theme',
+          title: 'Dark mode',
+          description: 'Switch the workspace tone for day or night.',
+          enabled: false,
+        },
+        {
+          id: 'glass',
+          title: 'Glass panels',
+          description: 'Keep premium blur and layered surfaces across the UI.',
+          enabled: true,
+        },
+      ],
+    },
+    {
+      id: 'privacy',
+      title: 'Privacy',
+      items: [
+        {
+          id: 'profile-visibility',
+          title: 'Profile visibility',
+          description: 'Your profile is visible to the wider network.',
+          enabled: true,
+        },
+      ],
+    },
+  ];
+}
+
 export function createMockAppData(viewerOverrides: Partial<ViewerUser> = {}): SocialAppData {
   const viewer = createMockViewer(viewerOverrides);
   const people = createPeople();
@@ -567,5 +603,6 @@ export function createMockAppData(viewerOverrides: Partial<ViewerUser> = {}): So
     profile: createProfile(viewer),
     jobs: createJobs(),
     communities: createCommunities(),
+    settings: createSettings(),
   };
 }

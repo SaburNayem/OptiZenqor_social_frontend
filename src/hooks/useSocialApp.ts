@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  buildExploreClusters,
   createPost as createPostApi,
   fetchDashboard,
+  fetchConnections,
+  fetchChatThreads,
   fetchMe,
+  fetchProfile,
+  fetchSettings,
+  forgotPassword as forgotPasswordApi,
   login as loginApi,
   markNotificationRead as markNotificationReadApi,
+  sendThreadMessage as sendThreadMessageApi,
+  signup as signupApi,
+  toggleFollowUser as toggleFollowUserApi,
+  updateProfile as updateProfileApi,
 } from '../lib/api';
 import { readSession, writeSession } from '../lib/session';
 import { createMockAppData, createMockSession, createMockViewer } from '../data/mockSocialData';
@@ -17,6 +27,7 @@ import {
   SocialAppData,
   SocialAppState,
   SocialPost,
+  SettingsGroup,
   ViewerUser,
 } from '../types';
 
@@ -50,7 +61,24 @@ function makeNotification(notification: DashboardData['notifications'][number]):
   };
 }
 
-function mergeDashboardIntoData(base: SocialAppData, dashboard: DashboardData, viewer: ViewerUser): SocialAppData {
+function mergeDashboardIntoData(
+  base: SocialAppData,
+  dashboard: DashboardData,
+  viewer: ViewerUser,
+  extras?: {
+    chats?: SocialAppData['chats'];
+    connections?: SocialAppData['connections'];
+    profile?: SocialAppData['profile'];
+    settings?: SettingsGroup[];
+  },
+): SocialAppData {
+  const explore = buildExploreClusters({
+    search: dashboard.search,
+    trends: dashboard.trends,
+    jobs: dashboard.jobs,
+    communities: dashboard.communities,
+  });
+
   return {
     ...base,
     stories: dashboard.stories.length > 0 ? dashboard.stories : base.stories,
@@ -74,15 +102,19 @@ function mergeDashboardIntoData(base: SocialAppData, dashboard: DashboardData, v
       dashboard.notifications.length > 0
         ? dashboard.notifications.map(makeNotification)
         : base.notifications,
-    jobs: dashboard.jobs.length > 0 ? dashboard.jobs : base.jobs,
-    communities: dashboard.communities.length > 0 ? dashboard.communities : base.communities,
-    profile: {
+    chats: extras?.chats?.length ? extras.chats : base.chats,
+    connections: extras?.connections?.length ? extras.connections : base.connections,
+    explore: explore.length > 0 ? explore : base.explore,
+    profile: extras?.profile ?? {
       ...base.profile,
       user: {
         ...base.profile.user,
         ...viewer,
       },
     },
+    jobs: dashboard.jobs.length > 0 ? dashboard.jobs : base.jobs,
+    communities: dashboard.communities.length > 0 ? dashboard.communities : base.communities,
+    settings: extras?.settings?.length ? extras.settings : base.settings,
   };
 }
 
@@ -113,6 +145,10 @@ export function useSocialApp(): SocialAppState {
 
     try {
       let viewer = fallbackViewer;
+      let chats = baseData.chats;
+      let connections = baseData.connections;
+      let profile = baseData.profile;
+      let settings = baseData.settings;
 
       if (activeSession?.accessToken) {
         try {
@@ -120,13 +156,31 @@ export function useSocialApp(): SocialAppState {
           const nextSession = { ...activeSession, user: viewer };
           setSession(nextSession);
           writeSession(nextSession);
+          const [profilePayload, chatPayload, connectionPayload, settingsPayload] =
+            await Promise.all([
+              fetchProfile(activeSession.accessToken),
+              fetchChatThreads(activeSession.accessToken, viewer.id),
+              fetchConnections(activeSession.accessToken),
+              fetchSettings(activeSession.accessToken),
+            ]);
+          profile = profilePayload;
+          chats = chatPayload;
+          connections = connectionPayload;
+          settings = settingsPayload;
         } catch {
           setSession(activeSession);
         }
       }
 
       const dashboard = await fetchDashboard(activeSession?.accessToken, '');
-      setData(mergeDashboardIntoData(baseData, dashboard, viewer));
+      setData(
+        mergeDashboardIntoData(baseData, dashboard, viewer, {
+          chats,
+          connections,
+          profile,
+          settings,
+        }),
+      );
       setLoadError(null);
     } catch (error) {
       setData(baseData);
@@ -214,16 +268,25 @@ export function useSocialApp(): SocialAppState {
       return { ok: false, message: 'Complete all fields to create an account.' };
     }
 
-    const demoSession = createMockSession({
-      name: input.name.trim(),
-      email: input.email.trim(),
-      username: input.name.toLowerCase().replace(/\s+/g, '.'),
-    });
-    setSession(demoSession);
-    writeSession(demoSession);
-    setData(createMockAppData(demoSession.user));
-    setAuthMessage('Account created in demo mode. Connect real auth endpoints when ready.');
-    return { ok: true, message: 'Your workspace is ready.' };
+    try {
+      const nextSession = await signupApi(input);
+      setSession(nextSession);
+      writeSession(nextSession);
+      setAuthMessage('Account created successfully.');
+      await refresh();
+      return { ok: true, message: 'Your workspace is ready.' };
+    } catch {
+      const demoSession = createMockSession({
+        name: input.name.trim(),
+        email: input.email.trim(),
+        username: input.name.toLowerCase().replace(/\s+/g, '.'),
+      });
+      setSession(demoSession);
+      writeSession(demoSession);
+      setData(createMockAppData(demoSession.user));
+      setAuthMessage('Signup API was unavailable, so demo mode is ready for you.');
+      return { ok: true, message: 'Your workspace is ready.' };
+    }
   }
 
   async function sendResetLink(email: string): Promise<AuthResult> {
@@ -231,8 +294,14 @@ export function useSocialApp(): SocialAppState {
       return { ok: false, message: 'Enter your email to continue.' };
     }
 
-    setAuthMessage(`Password reset instructions prepared for ${email.trim()}.`);
-    return { ok: true, message: 'Reset instructions are ready.' };
+    try {
+      await forgotPasswordApi(email.trim());
+      setAuthMessage(`Password reset instructions were sent to ${email.trim()}.`);
+      return { ok: true, message: 'Reset instructions are ready.' };
+    } catch {
+      setAuthMessage(`Password reset instructions prepared for ${email.trim()}.`);
+      return { ok: true, message: 'Reset instructions are ready.' };
+    }
   }
 
   function logout() {
@@ -389,17 +458,32 @@ export function useSocialApp(): SocialAppState {
           : chat,
       ),
     }));
+
+    if (session.accessToken !== 'demo-access-token') {
+      void sendThreadMessageApi(chatId, message.trim(), session.accessToken).catch(() => undefined);
+    }
   }
 
   function toggleFollowSuggestion(suggestionId: string) {
+    const suggestion = data.suggestions.find((item) => item.id === suggestionId);
+    if (!suggestion) {
+      return;
+    }
+
+    const nextFollowing = !suggestion.following;
+
     setData((current) => ({
       ...current,
-      suggestions: current.suggestions.map((suggestion) =>
-        suggestion.id === suggestionId
-          ? { ...suggestion, following: !suggestion.following }
-          : suggestion,
+      suggestions: current.suggestions.map((item) =>
+        item.id === suggestionId ? { ...item, following: nextFollowing } : item,
       ),
     }));
+
+    if (session?.accessToken && session.accessToken !== 'demo-access-token') {
+      void toggleFollowUserApi(suggestion.user.id, nextFollowing, session.accessToken).catch(
+        () => undefined,
+      );
+    }
   }
 
   function updateProfile(
@@ -429,6 +513,21 @@ export function useSocialApp(): SocialAppState {
       };
       setSession(nextSession);
       writeSession(nextSession);
+    }
+
+    if (session?.accessToken && session.accessToken !== 'demo-access-token') {
+      void updateProfileApi(
+        {
+          name: input.name,
+          headline: input.headline,
+          location: input.location,
+          website: input.website,
+          about: input.about,
+        },
+        session.accessToken,
+      )
+        .then(() => refresh({ silent: true }))
+        .catch(() => undefined);
     }
   }
 
