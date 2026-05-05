@@ -31,8 +31,8 @@ export function CreatePost({ viewer, onSubmit }: CreatePostProps) {
     <Card className="overflow-hidden">
       <div className="flex items-start gap-3">
         <Avatar
-          src={viewer?.avatar ?? 'https://ui-avatars.com/api/?name=Guest&background=334155&color=ffffff'}
-          alt={viewer?.name ?? 'Guest'}
+          src={viewer?.avatar ?? 'https://ui-avatars.com/api/?name=Member&background=334155&color=ffffff'}
+          alt={viewer?.name ?? 'Member'}
           size="lg"
         />
         <div className="min-w-0 flex-1">
@@ -54,8 +54,7 @@ export function CreatePost({ viewer, onSubmit }: CreatePostProps) {
             value={value}
             onChange={(event) => setValue(event.target.value)}
             rows={4}
-            placeholder={viewer ? 'What idea, launch, or insight should your network see today?' : 'Sign in to publish posts and join the conversation.'}
-            disabled={!viewer}
+            placeholder="What idea, launch, or insight should your network see today?"
             className="w-full rounded-[24px] border border-white/70 bg-white/70 p-4 text-sm text-slate-900 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:focus:ring-sky-500/20"
           />
 
@@ -86,7 +85,7 @@ export function CreatePost({ viewer, onSubmit }: CreatePostProps) {
                 Video
               </Button>
             </div>
-            <Button onClick={() => void handleSubmit()} disabled={!viewer || !value.trim() || isSubmitting}>
+            <Button onClick={() => void handleSubmit()} disabled={!value.trim() || isSubmitting}>
               Publish post
             </Button>
           </div>

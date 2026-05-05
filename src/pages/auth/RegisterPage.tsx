@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAppOutlet } from '../../hooks/useAppOutlet';
 import { Button } from '../../components/ui/Button';
@@ -6,21 +6,18 @@ import { Input } from '../../components/ui/Input';
 
 export function RegisterPage() {
   const { app } = useAppOutlet();
-  const [name, setName] = useState('Ariana Cole');
-  const [email, setEmail] = useState('ariana@optizenqor.com');
-  const [password, setPassword] = useState('demo12345');
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
-
-  if (app.session) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <div>
-      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Create account</p>
-      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Join the premium network</h1>
+      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Alternative entry</p>
+      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Enter the social web</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Start with a polished profile, curated feed, and collaborative messaging experience.
+        No real account is created here. This page just takes you into the static app experience.
       </p>
 
       <div className="mt-8 space-y-4">
@@ -38,9 +35,10 @@ export function RegisterPage() {
           onClick={async () => {
             const result = await app.register({ name, email, password });
             setMessage(result.message);
+            navigate('/');
           }}
         >
-          Create account
+          Open home screen
         </Button>
       </div>
 
@@ -49,9 +47,9 @@ export function RegisterPage() {
       ) : null}
 
       <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
-        Already have an account?{' '}
+        Prefer the first entry page?{' '}
         <Link className="font-medium text-sky-600 dark:text-sky-300" to="/auth/login">
-          Sign in
+          Open it here
         </Link>
       </p>
     </div>

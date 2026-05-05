@@ -66,7 +66,7 @@ const Navbar = ({
             </button>
           ) : (
             <div className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600">
-              Guest Mode
+              Login required
             </div>
           )}
         </div>

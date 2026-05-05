@@ -159,7 +159,7 @@ function normalizeUser(raw: unknown): ViewerUser {
   return {
     id: asText(record.id, `user-${Math.random().toString(36).slice(2, 8)}`),
     name: asText(record.name, 'Unknown User'),
-    username: asText(record.username, 'guest'),
+    username: asText(record.username, 'member'),
     email: asText(record.email),
     avatar:
       asText(record.avatar) ||

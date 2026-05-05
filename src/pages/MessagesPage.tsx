@@ -69,7 +69,7 @@ export function MessagesPage() {
                   app.sendMessage(selectedChat.id, draft);
                   setDraft('');
                 }}
-                disabled={!draft.trim() || !app.session}
+                disabled={!draft.trim()}
               >
                 <SendHorizonal className="h-4 w-4" />
                 Send

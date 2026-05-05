@@ -9,15 +9,13 @@ import {
   fetchProfile,
   fetchSettings,
   forgotPassword as forgotPasswordApi,
-  login as loginApi,
   markNotificationRead as markNotificationReadApi,
   sendThreadMessage as sendThreadMessageApi,
-  signup as signupApi,
   toggleFollowUser as toggleFollowUserApi,
   updateProfile as updateProfileApi,
 } from '../lib/api';
 import { readSession, writeSession } from '../lib/session';
-import { createMockAppData, createMockSession, createMockViewer } from '../data/mockSocialData';
+import { createMockAppData, createMockViewer } from '../data/mockSocialData';
 import { createId } from '../lib/utils';
 import {
   AppNotification,
@@ -122,19 +120,33 @@ function includesSearch(haystack: string, needle: string) {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
+function createStaticViewer(overrides: Partial<ViewerUser> = {}): ViewerUser {
+  return createMockViewer({
+    name: 'Socity Visitor',
+    username: 'socity.visitor',
+    role: 'Community Member',
+    verified: false,
+    ...overrides,
+  });
+}
+
 export function useSocialApp(): SocialAppState {
   const [session, setSession] = useState<SessionState | null>(() => readSession());
-  const [data, setData] = useState<SocialAppData>(() => createMockAppData(readSession()?.user));
+  const [data, setData] = useState<SocialAppData>(() =>
+    createMockAppData(readSession()?.user ?? createStaticViewer()),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedChatId, setSelectedChatId] = useState(() => createMockAppData().chats[0]?.id ?? '');
+  const [selectedChatId, setSelectedChatId] = useState(
+    () => createMockAppData(readSession()?.user ?? createStaticViewer()).chats[0]?.id ?? '',
+  );
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const activeSession = readSession();
-    const fallbackViewer = activeSession?.user ?? createMockViewer();
+    const fallbackViewer = activeSession?.user ?? createStaticViewer();
     const baseData = createMockAppData(fallbackViewer);
 
     if (options?.silent) {
@@ -144,35 +156,35 @@ export function useSocialApp(): SocialAppState {
     }
 
     try {
-      let viewer = fallbackViewer;
+      if (!activeSession?.accessToken) {
+        setData(baseData);
+        setLoadError(null);
+        return;
+      }
+
+      let viewer = activeSession.user;
       let chats = baseData.chats;
       let connections = baseData.connections;
       let profile = baseData.profile;
       let settings = baseData.settings;
 
-      if (activeSession?.accessToken) {
-        try {
-          viewer = await fetchMe(activeSession.accessToken);
-          const nextSession = { ...activeSession, user: viewer };
-          setSession(nextSession);
-          writeSession(nextSession);
-          const [profilePayload, chatPayload, connectionPayload, settingsPayload] =
-            await Promise.all([
-              fetchProfile(activeSession.accessToken),
-              fetchChatThreads(activeSession.accessToken, viewer.id),
-              fetchConnections(activeSession.accessToken),
-              fetchSettings(activeSession.accessToken),
-            ]);
-          profile = profilePayload;
-          chats = chatPayload;
-          connections = connectionPayload;
-          settings = settingsPayload;
-        } catch {
-          setSession(activeSession);
-        }
-      }
+      viewer = await fetchMe(activeSession.accessToken);
+      const nextSession = { ...activeSession, user: viewer };
+      setSession(nextSession);
+      writeSession(nextSession);
+      const [profilePayload, chatPayload, connectionPayload, settingsPayload] =
+        await Promise.all([
+          fetchProfile(activeSession.accessToken),
+          fetchChatThreads(activeSession.accessToken, viewer.id),
+          fetchConnections(activeSession.accessToken),
+          fetchSettings(activeSession.accessToken),
+        ]);
+      profile = profilePayload;
+      chats = chatPayload;
+      connections = connectionPayload;
+      settings = settingsPayload;
 
-      const dashboard = await fetchDashboard(activeSession?.accessToken, '');
+      const dashboard = await fetchDashboard(activeSession.accessToken, '');
       setData(
         mergeDashboardIntoData(baseData, dashboard, viewer, {
           chats,
@@ -186,8 +198,8 @@ export function useSocialApp(): SocialAppState {
       setData(baseData);
       setLoadError(
         error instanceof Error
-          ? `${error.message}. Showing premium demo data while APIs catch up.`
-          : 'Showing premium demo data while APIs catch up.',
+          ? `${error.message}. Showing static social preview data instead.`
+          : 'Showing static social preview data instead.',
       );
     } finally {
       setIsLoading(false);
@@ -242,25 +254,9 @@ export function useSocialApp(): SocialAppState {
       return { ok: false, message: 'Enter both email and password.' };
     }
 
-    try {
-      const nextSession = await loginApi(email.trim(), password);
-      setSession(nextSession);
-      writeSession(nextSession);
-      setAuthMessage('Signed in successfully.');
-      await refresh();
-      return { ok: true, message: 'Welcome back.' };
-    } catch {
-      const demoSession = createMockSession({
-        name: email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
-        email,
-      });
-      setSession(demoSession);
-      writeSession(demoSession);
-      setData(createMockAppData(demoSession.user));
-      setAuthMessage('API login was unavailable, so demo mode is ready for you.');
-      setSelectedChatId(createMockAppData(demoSession.user).chats[0]?.id ?? '');
-      return { ok: true, message: 'Signed into the demo workspace.' };
-    }
+    setAuthMessage('Static preview opened.');
+    await refresh({ silent: true });
+    return { ok: true, message: 'Static preview opened.' };
   }
 
   async function register(input: { name: string; email: string; password: string }): Promise<AuthResult> {
@@ -268,25 +264,9 @@ export function useSocialApp(): SocialAppState {
       return { ok: false, message: 'Complete all fields to create an account.' };
     }
 
-    try {
-      const nextSession = await signupApi(input);
-      setSession(nextSession);
-      writeSession(nextSession);
-      setAuthMessage('Account created successfully.');
-      await refresh();
-      return { ok: true, message: 'Your workspace is ready.' };
-    } catch {
-      const demoSession = createMockSession({
-        name: input.name.trim(),
-        email: input.email.trim(),
-        username: input.name.toLowerCase().replace(/\s+/g, '.'),
-      });
-      setSession(demoSession);
-      writeSession(demoSession);
-      setData(createMockAppData(demoSession.user));
-      setAuthMessage('Signup API was unavailable, so demo mode is ready for you.');
-      return { ok: true, message: 'Your workspace is ready.' };
-    }
+    setAuthMessage('Static preview opened.');
+    await refresh({ silent: true });
+    return { ok: true, message: 'Static preview opened.' };
   }
 
   async function sendResetLink(email: string): Promise<AuthResult> {
@@ -307,21 +287,22 @@ export function useSocialApp(): SocialAppState {
   function logout() {
     setSession(null);
     writeSession(null);
-    const fallback = createMockAppData();
+    const fallback = createMockAppData(createStaticViewer());
     setData(fallback);
     setSelectedChatId(fallback.chats[0]?.id ?? '');
-    setAuthMessage('You are browsing OptiZenqor Social in guest mode.');
+    setAuthMessage('Signed out. You are now browsing the static social preview.');
   }
 
   async function createPost(input: { content: string; mediaType: 'text' | 'image' | 'video' }): Promise<AuthResult> {
-    if (!input.content.trim() || !session) {
-      return { ok: false, message: 'Sign in and write something before posting.' };
+    if (!input.content.trim()) {
+      return { ok: false, message: 'Write something before posting.' };
     }
+    const activeUser = session?.user ?? createStaticViewer();
 
     const optimisticPost: SocialPost = {
       id: createId('post'),
       network: input.mediaType === 'text' ? 'x' : input.mediaType === 'image' ? 'instagram' : 'facebook',
-      user: session.user,
+      user: activeUser,
       headline: input.mediaType === 'video' ? 'Video Update' : input.mediaType === 'image' ? 'Visual Post' : 'Fresh Thought',
       content: input.content.trim(),
       likes: 0,
@@ -364,15 +345,23 @@ export function useSocialApp(): SocialAppState {
     }));
 
     try {
-      if (session.accessToken !== 'demo-access-token') {
+      if (session?.accessToken) {
         await createPostApi(
           { caption: input.content.trim(), tags: optimisticPost.tags },
           session.accessToken,
         );
+        return { ok: true, message: 'Post published.' };
       }
-      return { ok: true, message: 'Post published.' };
-    } catch {
-      return { ok: true, message: 'Posted locally while the backend is unavailable.' };
+      return { ok: true, message: 'Post added in static preview.' };
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        posts: current.posts.filter((post) => post.id !== optimisticPost.id),
+      }));
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : 'Unable to publish this post right now.',
+      };
     }
   }
 
@@ -399,9 +388,10 @@ export function useSocialApp(): SocialAppState {
   }
 
   function addComment(postId: string, message: string) {
-    if (!message.trim() || !session) {
+    if (!message.trim()) {
       return;
     }
+    const activeUser = session?.user ?? createStaticViewer();
 
     updatePost(postId, (post) => ({
       ...post,
@@ -410,7 +400,7 @@ export function useSocialApp(): SocialAppState {
         ...post.commentsList,
         {
           id: createId('comment'),
-          user: session.user,
+          user: activeUser,
           message: message.trim(),
           createdAt: 'Just now',
         },
@@ -426,15 +416,16 @@ export function useSocialApp(): SocialAppState {
       ),
     }));
 
-    if (session?.accessToken && session.accessToken !== 'demo-access-token') {
+    if (session?.accessToken) {
       void markNotificationReadApi(notificationId, session.accessToken).catch(() => undefined);
     }
   }
 
   function sendMessage(chatId: string, message: string) {
-    if (!message.trim() || !session) {
+    if (!message.trim()) {
       return;
     }
+    const activeUser = session?.user ?? createStaticViewer();
 
     setData((current) => ({
       ...current,
@@ -448,7 +439,7 @@ export function useSocialApp(): SocialAppState {
                 ...chat.messages,
                 {
                   id: createId('message'),
-                  authorId: session.user.id,
+                  authorId: activeUser.id,
                   body: message.trim(),
                   createdAt: 'Now',
                   status: 'sent',
@@ -459,7 +450,7 @@ export function useSocialApp(): SocialAppState {
       ),
     }));
 
-    if (session.accessToken !== 'demo-access-token') {
+    if (session?.accessToken) {
       void sendThreadMessageApi(chatId, message.trim(), session.accessToken).catch(() => undefined);
     }
   }
@@ -479,7 +470,7 @@ export function useSocialApp(): SocialAppState {
       ),
     }));
 
-    if (session?.accessToken && session.accessToken !== 'demo-access-token') {
+    if (session?.accessToken) {
       void toggleFollowUserApi(suggestion.user.id, nextFollowing, session.accessToken).catch(
         () => undefined,
       );
@@ -515,7 +506,7 @@ export function useSocialApp(): SocialAppState {
       writeSession(nextSession);
     }
 
-    if (session?.accessToken && session.accessToken !== 'demo-access-token') {
+    if (session?.accessToken) {
       void updateProfileApi(
         {
           name: input.name,

@@ -131,16 +131,15 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
 
           <div className="flex gap-3">
             <Avatar
-              src={viewer?.avatar ?? 'https://ui-avatars.com/api/?name=Guest&background=334155&color=ffffff'}
-              alt={viewer?.name ?? 'Guest'}
+              src={viewer?.avatar ?? 'https://ui-avatars.com/api/?name=Member&background=334155&color=ffffff'}
+              alt={viewer?.name ?? 'Member'}
               size="sm"
             />
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[24px] border border-white/70 bg-white px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <input
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
-                placeholder={viewer ? 'Write a thoughtful reply...' : 'Sign in to join the conversation.'}
-                disabled={!viewer}
+                placeholder="Write a thoughtful reply..."
                 className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed dark:text-white"
               />
               <Button
@@ -149,7 +148,7 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
                   onComment(post.id, comment);
                   setComment('');
                 }}
-                disabled={!viewer || !comment.trim()}
+                disabled={!comment.trim()}
               >
                 <Send className="h-4 w-4" />
               </Button>

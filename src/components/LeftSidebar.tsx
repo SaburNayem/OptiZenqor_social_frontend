@@ -23,14 +23,14 @@ const LeftSidebar = ({ user, stats, apiBaseUrl }: LeftSidebarProps) => {
             <img
               src={
                 user?.avatar ||
-                'https://ui-avatars.com/api/?name=Socity+Guest&background=0f172a&color=ffffff'
+                'https://ui-avatars.com/api/?name=Socity+Member&background=0f172a&color=ffffff'
               }
-              alt={user?.name || 'Guest'}
+              alt={user?.name || 'Member'}
               className="h-14 w-14 rounded-2xl object-cover"
             />
             <div>
-              <p className="text-sm font-semibold text-slate-900">{user?.name || 'Guest Viewer'}</p>
-              <p className="text-xs text-slate-500">{user?.role || 'Explore mode'}</p>
+              <p className="text-sm font-semibold text-slate-900">{user?.name || 'Socity Member'}</p>
+              <p className="text-xs text-slate-500">{user?.role || 'Authenticated user'}</p>
             </div>
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-600">

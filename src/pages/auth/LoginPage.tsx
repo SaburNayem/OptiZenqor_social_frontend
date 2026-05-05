@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAppOutlet } from '../../hooks/useAppOutlet';
 import { Button } from '../../components/ui/Button';
@@ -6,20 +6,17 @@ import { Input } from '../../components/ui/Input';
 
 export function LoginPage() {
   const { app } = useAppOutlet();
-  const [email, setEmail] = useState('ariana@optizenqor.com');
-  const [password, setPassword] = useState('demo12345');
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
-
-  if (app.session) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <div>
-      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Welcome back</p>
-      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Sign in to OptiZenqor Social</h1>
+      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Static preview</p>
+      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Open OptiZenqor Social</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Access your network, messages, creator tools, and premium profile workspace.
+        This version is fully static, so you can enter the home screen directly without backend login.
       </p>
 
       <div className="mt-8 space-y-4">
@@ -35,9 +32,10 @@ export function LoginPage() {
           onClick={async () => {
             const result = await app.login(email, password);
             setMessage(result.message);
+            navigate('/');
           }}
         >
-          Sign in
+          Open home screen
         </Button>
       </div>
 
@@ -47,12 +45,12 @@ export function LoginPage() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
         <Link className="font-medium text-sky-600 dark:text-sky-300" to="/auth/forgot-password">
-          Forgot password?
+          Need the recovery screen?
         </Link>
         <p className="text-slate-500 dark:text-slate-400">
-          New here?{' '}
+          Want the second entry page?{' '}
           <Link className="font-medium text-sky-600 dark:text-sky-300" to="/auth/register">
-            Create an account
+            Open it here
           </Link>
         </p>
       </div>
