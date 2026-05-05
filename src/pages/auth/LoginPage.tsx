@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAppOutlet } from '../../hooks/useAppOutlet';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { getApiBaseUrl } from '../../lib/api';
 
 export function LoginPage() {
   const { app } = useAppOutlet();
@@ -17,6 +18,9 @@ export function LoginPage() {
       <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Sign in to OptiZenqor Social</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
         Use your backend account to open the live social workspace.
+      </p>
+      <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+        API base URL: {getApiBaseUrl()}
       </p>
 
       <div className="mt-8 space-y-4">

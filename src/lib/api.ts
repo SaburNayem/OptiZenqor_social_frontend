@@ -126,6 +126,14 @@ function pickObject(payload: unknown) {
   return isRecord(payload.data) ? payload.data : payload;
 }
 
+function buildNetworkErrorMessage(error: unknown) {
+  if (error instanceof TypeError) {
+    return `Unable to reach the backend at ${API_BASE_URL}. Make sure the backend is running, the URL is correct, and this web origin is allowed by backend CORS.`;
+  }
+
+  return error instanceof Error ? error.message : 'Unable to reach the backend.';
+}
+
 async function request(path: string, init: RequestInit = {}, token?: string) {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
@@ -138,10 +146,17 @@ async function request(path: string, init: RequestInit = {}, token?: string) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    const wrappedError = new Error(buildNetworkErrorMessage(error)) as Error & { cause?: unknown };
+    wrappedError.cause = error;
+    throw wrappedError;
+  }
 
   const contentType = response.headers.get('content-type') ?? '';
   const body = contentType.includes('application/json')

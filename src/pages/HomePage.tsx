@@ -3,6 +3,7 @@ import { Card } from '../components/ui/Card';
 import { StoryCard } from '../components/social/StoryCard';
 import { CreatePost } from '../components/social/CreatePost';
 import { PostCard } from '../components/social/PostCard';
+import { getApiBaseUrl } from '../lib/api';
 
 export function HomePage() {
   const { app } = useAppOutlet();
@@ -13,6 +14,9 @@ export function HomePage() {
         <Card className="border-sky-200 bg-sky-50/80 dark:border-sky-900/50 dark:bg-sky-950/20">
           <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">Backend sync issue</p>
           <p className="mt-1 text-sm text-sky-700/80 dark:text-sky-200/80">{app.loadError}</p>
+          <p className="mt-2 text-xs text-sky-700/70 dark:text-sky-200/70">
+            Current API base URL: {getApiBaseUrl()}
+          </p>
         </Card>
       ) : null}
 
