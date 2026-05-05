@@ -1,3 +1,16 @@
+export type ThemeMode = 'light' | 'dark';
+
+export type AppPage =
+  | 'home'
+  | 'explore'
+  | 'notifications'
+  | 'messages'
+  | 'connections'
+  | 'profile'
+  | 'settings';
+
+export type AuthView = 'login' | 'register' | 'forgot-password';
+
 export interface ViewerUser {
   id: string;
   name: string;
@@ -9,6 +22,10 @@ export interface ViewerUser {
   verified: boolean;
   followers?: number;
   following?: number;
+  location?: string;
+  website?: string;
+  coverImage?: string;
+  headline?: string;
 }
 
 export interface SessionState {
@@ -124,4 +141,175 @@ export interface DashboardData {
   notifications: NotificationView[];
   search: SearchItemView[];
   stats: DashboardStats;
+}
+
+export interface PostMedia {
+  id: string;
+  type: 'image' | 'video';
+  url: string;
+  alt: string;
+  poster?: string;
+}
+
+export interface PostComment {
+  id: string;
+  user: ViewerUser;
+  message: string;
+  createdAt: string;
+}
+
+export interface SocialPost extends FeedPostView {
+  excerpt?: string;
+  media: PostMedia[];
+  liked: boolean;
+  saved: boolean;
+  visibility: 'public' | 'connections' | 'private';
+  commentsList: PostComment[];
+}
+
+export interface SuggestionItem {
+  id: string;
+  user: ViewerUser;
+  reason: string;
+  mutualCount: number;
+  following: boolean;
+}
+
+export interface AppNotification extends NotificationView {
+  icon: 'heart' | 'message' | 'user-plus' | 'sparkles' | 'briefcase';
+  cta?: string;
+}
+
+export interface TrendItem extends TrendView {
+  category: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  status?: 'sent' | 'seen';
+}
+
+export interface ChatThread {
+  id: string;
+  participant: ViewerUser;
+  roleLabel: string;
+  preview: string;
+  unreadCount: number;
+  lastActive: string;
+  online: boolean;
+  messages: ChatMessage[];
+}
+
+export interface ConnectionItem {
+  id: string;
+  user: ViewerUser;
+  relationship: 'following' | 'requested' | 'teammate' | 'mentor';
+  note: string;
+  sharedTags: string[];
+}
+
+export interface ProfileMetric {
+  label: string;
+  value: string;
+}
+
+export interface ProfileHighlight {
+  id: string;
+  label: string;
+  value: string;
+  description: string;
+}
+
+export interface UserProfile {
+  user: ViewerUser;
+  coverImage: string;
+  headline: string;
+  about: string;
+  location: string;
+  website: string;
+  joinedLabel: string;
+  skills: string[];
+  metrics: ProfileMetric[];
+  highlights: ProfileHighlight[];
+}
+
+export interface ExploreCluster {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  stat: string;
+}
+
+export interface SettingsItem {
+  id: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+}
+
+export interface SettingsGroup {
+  id: string;
+  title: string;
+  items: SettingsItem[];
+}
+
+export interface SocialAppData {
+  stories: StoryView[];
+  posts: SocialPost[];
+  reels: ReelView[];
+  suggestions: SuggestionItem[];
+  trends: TrendItem[];
+  notifications: AppNotification[];
+  chats: ChatThread[];
+  connections: ConnectionItem[];
+  explore: ExploreCluster[];
+  profile: UserProfile;
+  jobs: JobView[];
+  communities: CommunityView[];
+}
+
+export interface AuthResult {
+  ok: boolean;
+  message: string;
+}
+
+export interface SocialAppState {
+  session: SessionState | null;
+  data: SocialAppData;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  loadError: string | null;
+  authMessage: string | null;
+  searchQuery: string;
+  selectedChatId: string;
+  setSearchQuery: (value: string) => void;
+  refresh: (options?: { silent?: boolean }) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (input: { name: string; email: string; password: string }) => Promise<AuthResult>;
+  sendResetLink: (email: string) => Promise<AuthResult>;
+  logout: () => void;
+  createPost: (input: { content: string; mediaType: 'text' | 'image' | 'video' }) => Promise<AuthResult>;
+  toggleLike: (postId: string) => void;
+  toggleSave: (postId: string) => void;
+  addComment: (postId: string, message: string) => void;
+  markNotificationRead: (notificationId: string) => void;
+  setSelectedChatId: (chatId: string) => void;
+  sendMessage: (chatId: string, message: string) => void;
+  toggleFollowSuggestion: (suggestionId: string) => void;
+  updateProfile: (input: Partial<UserProfile['user']> & { about?: string; website?: string; location?: string }) => void;
+}
+
+export interface ThemeState {
+  mode: ThemeMode;
+  setMode: (mode: ThemeMode) => void;
+  toggleMode: () => void;
+}
+
+export interface AppOutletContext {
+  app: SocialAppState;
+  theme: ThemeState;
 }

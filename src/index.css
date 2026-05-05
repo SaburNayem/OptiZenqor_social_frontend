@@ -1,12 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
-
 @layer base {
   :root {
     color-scheme: light;
+    font-family: 'Instrument Sans', sans-serif;
   }
 
   * {
@@ -20,21 +21,37 @@
   body {
     margin: 0;
     min-width: 320px;
-    font-family: 'Instrument Sans', sans-serif;
     background:
-      radial-gradient(circle at top left, rgba(29, 155, 240, 0.15), transparent 26%),
-      radial-gradient(circle at top right, rgba(255, 140, 66, 0.12), transparent 22%),
-      linear-gradient(180deg, #f8fbff 0%, #f5f7fb 45%, #eef2f7 100%);
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 24%),
+      radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 22%),
+      linear-gradient(180deg, #f8fbff 0%, #f3f7fb 46%, #eef4fb 100%);
     color: #0f172a;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  button {
+  body.dark,
+  .dark body {
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 24%),
+      radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 22%),
+      linear-gradient(180deg, #020617 0%, #0f172a 48%, #111827 100%);
+    color: #f8fafc;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  textarea {
     font: inherit;
   }
 
-  img {
+  img,
+  video {
     display: block;
     max-width: 100%;
   }
@@ -43,32 +60,17 @@
 @layer components {
   .bg-app {
     background:
-      radial-gradient(circle at top left, rgba(29, 155, 240, 0.12), transparent 24%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(241, 245, 249, 0.92));
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 26%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(239, 246, 255, 0.92));
   }
 
-  .panel-surface {
-    @apply rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-6;
-  }
-
-  .icon-button {
-    @apply flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/80 text-slate-600 transition hover:-translate-y-0.5 hover:text-slate-900 hover:shadow-[0_12px_30px_rgba(15,23,42,0.12)];
-  }
-
-  .section-kicker {
-    @apply text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400;
+  .bg-app-dark {
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(2, 6, 23, 0.94), rgba(15, 23, 42, 0.96));
   }
 
   .section-title {
     font-family: 'Space Grotesk', sans-serif;
-    @apply text-xl font-bold tracking-tight text-slate-900;
-  }
-
-  .form-input {
-    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-300;
-  }
-
-  .scroll-row {
-    @apply flex gap-4 overflow-x-auto pb-2;
   }
 }
