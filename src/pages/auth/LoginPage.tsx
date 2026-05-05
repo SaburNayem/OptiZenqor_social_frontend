@@ -13,10 +13,10 @@ export function LoginPage() {
 
   return (
     <div>
-      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Static preview</p>
-      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Open OptiZenqor Social</h1>
+      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Live session</p>
+      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Sign in to OptiZenqor Social</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        This version is fully static, so you can enter the home screen directly without backend login.
+        Use your backend account to open the live social workspace.
       </p>
 
       <div className="mt-8 space-y-4">
@@ -32,10 +32,12 @@ export function LoginPage() {
           onClick={async () => {
             const result = await app.login(email, password);
             setMessage(result.message);
-            navigate('/');
+            if (result.ok) {
+              navigate('/');
+            }
           }}
         >
-          Open home screen
+          Sign in
         </Button>
       </div>
 
@@ -45,12 +47,12 @@ export function LoginPage() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
         <Link className="font-medium text-sky-600 dark:text-sky-300" to="/auth/forgot-password">
-          Need the recovery screen?
+          Forgot your password?
         </Link>
         <p className="text-slate-500 dark:text-slate-400">
-          Want the second entry page?{' '}
+          Need an account?{' '}
           <Link className="font-medium text-sky-600 dark:text-sky-300" to="/auth/register">
-            Open it here
+            Create one here
           </Link>
         </p>
       </div>

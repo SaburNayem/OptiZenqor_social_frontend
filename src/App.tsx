@@ -5,6 +5,13 @@ import { useSocialApp } from './hooks/useSocialApp';
 import { useTheme } from './hooks/useTheme';
 import { HomePage } from './pages/HomePage';
 import { ExplorePage } from './pages/ExplorePage';
+import { MarketplacePage } from './pages/MarketplacePage';
+import { JobsPage } from './pages/JobsPage';
+import { EventsPage } from './pages/EventsPage';
+import { CommunitiesPage } from './pages/CommunitiesPage';
+import { PagesDirectoryPage } from './pages/PagesDirectoryPage';
+import { CallsPage } from './pages/CallsPage';
+import { LiveStreamsPage } from './pages/LiveStreamsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { ConnectionsPage } from './pages/ConnectionsPage';
@@ -14,6 +21,14 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { AppOutletContext } from './types';
+
+function RequireSession({ context }: { context: AppOutletContext }) {
+  if (!context.app.session?.accessToken) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
+  return <AppLayout context={context} />;
+}
 
 function App() {
   const app = useSocialApp();
@@ -33,9 +48,16 @@ function App() {
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
 
-        <Route element={<AppLayout context={context} />}>
+        <Route element={<RequireSession context={context} />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/communities" element={<CommunitiesPage />} />
+          <Route path="/pages" element={<PagesDirectoryPage />} />
+          <Route path="/calls" element={<CallsPage />} />
+          <Route path="/live-streams" element={<LiveStreamsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />

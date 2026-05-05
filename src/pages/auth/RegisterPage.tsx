@@ -14,10 +14,10 @@ export function RegisterPage() {
 
   return (
     <div>
-      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Alternative entry</p>
-      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Enter the social web</h1>
+      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Create account</p>
+      <h1 className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">Join OptiZenqor Social</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        No real account is created here. This page just takes you into the static app experience.
+        Create a real backend account and continue straight into the app.
       </p>
 
       <div className="mt-8 space-y-4">
@@ -35,10 +35,12 @@ export function RegisterPage() {
           onClick={async () => {
             const result = await app.register({ name, email, password });
             setMessage(result.message);
-            navigate('/');
+            if (result.ok) {
+              navigate('/');
+            }
           }}
         >
-          Open home screen
+          Create account
         </Button>
       </div>
 
@@ -47,9 +49,9 @@ export function RegisterPage() {
       ) : null}
 
       <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
-        Prefer the first entry page?{' '}
+        Already have an account?{' '}
         <Link className="font-medium text-sky-600 dark:text-sky-300" to="/auth/login">
-          Open it here
+          Sign in here
         </Link>
       </p>
     </div>

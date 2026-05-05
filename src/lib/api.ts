@@ -1,11 +1,16 @@
 import {
+  CallView,
   ChatThread,
   ConnectionItem,
   CommunityView,
   DashboardData,
+  EventView,
   FeedPostView,
   JobView,
+  LiveStreamView,
+  MarketplaceItemView,
   NotificationView,
+  PageView,
   ReelView,
   SearchItemView,
   SessionState,
@@ -291,6 +296,86 @@ function normalizeCommunity(raw: unknown): CommunityView {
     location: asText(record.location, 'Global'),
     memberCount: asNumber(record.memberCount),
     tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
+  };
+}
+
+function normalizeMarketplaceItem(raw: unknown): MarketplaceItemView {
+  const record = isRecord(raw) ? raw : {};
+  const priceValue = record.price;
+  const numericPrice = typeof priceValue === 'number' ? priceValue : null;
+  return {
+    id: asText(record.id),
+    title: asText(record.title, 'Marketplace item'),
+    description: asText(record.description, 'No description yet.'),
+    price:
+      asText(record.priceLabel) ||
+      asText(record.price) ||
+      (numericPrice !== null ? `$${numericPrice}` : 'Price on request'),
+    location: asText(record.location, 'Location not set'),
+    status: capitalize(asText(record.status, 'active')),
+    sellerName:
+      asText(record.sellerName) ||
+      asText((record.seller as JsonRecord | undefined)?.name) ||
+      'Seller',
+    image:
+      asText(record.image) ||
+      asText(record.thumbnail) ||
+      (toArray(record.images).find((item) => typeof item === 'string') as string | undefined),
+    category: asText(record.category),
+  };
+}
+
+function normalizeEvent(raw: unknown): EventView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    title: asText(record.title, 'Event'),
+    description: asText(record.description, 'Event details will appear here.'),
+    location: asText(record.location, 'Online'),
+    startsAt: asText(record.startDate) || asText(record.startsAt) || formatRelative(asText(record.createdAt)),
+    status: capitalize(asText(record.status, 'approved')),
+    attendeeCount: asNumber(record.attendeeCount, asNumber(record.rsvpCount)),
+    image: asText(record.image) || asText(record.coverImageUrl),
+  };
+}
+
+function normalizePage(raw: unknown): PageView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    name: asText(record.name, 'Page'),
+    description: asText(record.description, 'No description yet.'),
+    category: asText(record.category, 'General'),
+    followers: asNumber(record.followers, asNumber(record.followerCount)),
+    actionLabel: asText(record.actionLabel, 'Follow'),
+    image: asText(record.coverImageUrl) || asText(record.avatar),
+  };
+}
+
+function normalizeCall(raw: unknown): CallView {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: asText(record.id),
+    name: asText(record.name, 'Call'),
+    type: capitalize(asText(record.type, 'audio')),
+    state: capitalize(asText(record.state, 'completed')),
+    time: formatRelative(asText(record.startedAt) || asText(record.time)),
+    avatarUrl: asText(record.avatarUrl),
+  };
+}
+
+function normalizeLiveStream(raw: unknown): LiveStreamView {
+  const record = isRecord(raw) ? raw : {};
+  const host = isRecord(record.host) ? record.host : {};
+  return {
+    id: asText(record.id),
+    title: asText(record.title, 'Live stream'),
+    description: asText(record.description, 'Live session in progress.'),
+    hostName: asText(host.name) || asText(record.hostName, 'Host'),
+    status: capitalize(asText(record.status, 'scheduled')),
+    viewerCount: asNumber(record.viewerCount),
+    category: asText(record.category, 'Live'),
+    image: asText(record.previewImageUrl),
   };
 }
 
@@ -698,6 +783,31 @@ export async function sendThreadMessage(threadId: string, text: string, token: s
 export async function fetchSettings(token: string) {
   const payload = await request('/settings', {}, token);
   return normalizeSettings(payload);
+}
+
+export async function fetchMarketplace(token?: string) {
+  const payload = await request('/marketplace', {}, token);
+  return pickList(payload, ['products', 'items', 'results']).map(normalizeMarketplaceItem);
+}
+
+export async function fetchEvents() {
+  const payload = await request('/events');
+  return pickList(payload, ['events', 'items', 'results']).map(normalizeEvent);
+}
+
+export async function fetchPages() {
+  const payload = await request('/pages');
+  return pickList(payload, ['pages', 'items', 'results']).map(normalizePage);
+}
+
+export async function fetchCalls(token: string) {
+  const payload = await request('/calls', {}, token);
+  return pickList(payload, ['calls', 'items', 'results']).map(normalizeCall);
+}
+
+export async function fetchLiveStreams() {
+  const payload = await request('/live-stream');
+  return pickList(payload, ['streams', 'items', 'results']).map(normalizeLiveStream);
 }
 
 export async function fetchDashboard(token?: string, searchQuery?: string) {

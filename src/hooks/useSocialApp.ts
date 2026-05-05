@@ -2,20 +2,26 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   buildExploreClusters,
   createPost as createPostApi,
+  fetchCalls,
   fetchDashboard,
   fetchConnections,
+  fetchEvents,
   fetchChatThreads,
+  fetchLiveStreams,
+  fetchMarketplace,
   fetchMe,
+  fetchPages,
   fetchProfile,
   fetchSettings,
   forgotPassword as forgotPasswordApi,
+  login as loginApi,
   markNotificationRead as markNotificationReadApi,
   sendThreadMessage as sendThreadMessageApi,
+  signup as signupApi,
   toggleFollowUser as toggleFollowUserApi,
   updateProfile as updateProfileApi,
 } from '../lib/api';
 import { readSession, writeSession } from '../lib/session';
-import { createMockAppData, createMockViewer } from '../data/mockSocialData';
 import { createId } from '../lib/utils';
 import {
   AppNotification,
@@ -28,6 +34,66 @@ import {
   SettingsGroup,
   ViewerUser,
 } from '../types';
+
+function createEmptyViewer(overrides: Partial<ViewerUser> = {}): ViewerUser {
+  return {
+    id: overrides.id ?? '',
+    name: overrides.name ?? 'Member',
+    username: overrides.username ?? 'member',
+    email: overrides.email ?? '',
+    avatar:
+      overrides.avatar ??
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(overrides.name ?? 'Member')}&background=0f172a&color=ffffff`,
+    bio: overrides.bio ?? '',
+    role: overrides.role ?? 'Member',
+    verified: overrides.verified ?? false,
+    followers: overrides.followers ?? 0,
+    following: overrides.following ?? 0,
+    location: overrides.location ?? '',
+    website: overrides.website ?? '',
+    coverImage: overrides.coverImage ?? '',
+    headline: overrides.headline ?? '',
+  };
+}
+
+function createEmptyData(viewer: ViewerUser): SocialAppData {
+  return {
+    stories: [],
+    posts: [],
+    reels: [],
+    marketplace: [],
+    suggestions: [],
+    trends: [],
+    notifications: [],
+    chats: [],
+    calls: [],
+    liveStreams: [],
+    connections: [],
+    explore: [],
+    profile: {
+      user: viewer,
+      coverImage: viewer.coverImage ?? '',
+      headline: viewer.headline ?? '',
+      about: viewer.bio ?? '',
+      location: viewer.location ?? '',
+      website: viewer.website ?? '',
+      joinedLabel: '',
+      skills: [],
+      metrics: [
+        { label: 'Followers', value: String(viewer.followers ?? 0) },
+        { label: 'Following', value: String(viewer.following ?? 0) },
+        { label: 'Posts', value: '0' },
+        { label: 'Verified', value: viewer.verified ? 'Yes' : 'No' },
+      ],
+      highlights: [],
+    },
+    jobs: [],
+    events: [],
+    communities: [],
+    pages: [],
+    settings: [],
+  };
+}
 
 function makeFeedPost(post: DashboardData['posts'][number]): SocialPost {
   const media = post.image
@@ -68,6 +134,11 @@ function mergeDashboardIntoData(
     connections?: SocialAppData['connections'];
     profile?: SocialAppData['profile'];
     settings?: SettingsGroup[];
+    marketplace?: SocialAppData['marketplace'];
+    events?: SocialAppData['events'];
+    pages?: SocialAppData['pages'];
+    calls?: SocialAppData['calls'];
+    liveStreams?: SocialAppData['liveStreams'];
   },
 ): SocialAppData {
   const explore = buildExploreClusters({
@@ -101,6 +172,8 @@ function mergeDashboardIntoData(
         ? dashboard.notifications.map(makeNotification)
         : base.notifications,
     chats: extras?.chats?.length ? extras.chats : base.chats,
+    calls: extras?.calls?.length ? extras.calls : base.calls,
+    liveStreams: extras?.liveStreams?.length ? extras.liveStreams : base.liveStreams,
     connections: extras?.connections?.length ? extras.connections : base.connections,
     explore: explore.length > 0 ? explore : base.explore,
     profile: extras?.profile ?? {
@@ -111,7 +184,10 @@ function mergeDashboardIntoData(
       },
     },
     jobs: dashboard.jobs.length > 0 ? dashboard.jobs : base.jobs,
+    marketplace: extras?.marketplace?.length ? extras.marketplace : base.marketplace,
+    events: extras?.events?.length ? extras.events : base.events,
     communities: dashboard.communities.length > 0 ? dashboard.communities : base.communities,
+    pages: extras?.pages?.length ? extras.pages : base.pages,
     settings: extras?.settings?.length ? extras.settings : base.settings,
   };
 }
@@ -120,34 +196,22 @@ function includesSearch(haystack: string, needle: string) {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
-function createStaticViewer(overrides: Partial<ViewerUser> = {}): ViewerUser {
-  return createMockViewer({
-    name: 'Socity Visitor',
-    username: 'socity.visitor',
-    role: 'Community Member',
-    verified: false,
-    ...overrides,
-  });
-}
-
 export function useSocialApp(): SocialAppState {
   const [session, setSession] = useState<SessionState | null>(() => readSession());
   const [data, setData] = useState<SocialAppData>(() =>
-    createMockAppData(readSession()?.user ?? createStaticViewer()),
+    createEmptyData(readSession()?.user ?? createEmptyViewer()),
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedChatId, setSelectedChatId] = useState(
-    () => createMockAppData(readSession()?.user ?? createStaticViewer()).chats[0]?.id ?? '',
-  );
+  const [selectedChatId, setSelectedChatId] = useState('');
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const activeSession = readSession();
-    const fallbackViewer = activeSession?.user ?? createStaticViewer();
-    const baseData = createMockAppData(fallbackViewer);
+    const fallbackViewer = activeSession?.user ?? createEmptyViewer();
+    const baseData = createEmptyData(fallbackViewer);
 
     if (options?.silent) {
       setIsRefreshing(true);
@@ -167,22 +231,37 @@ export function useSocialApp(): SocialAppState {
       let connections = baseData.connections;
       let profile = baseData.profile;
       let settings = baseData.settings;
+      let marketplace = baseData.marketplace;
+      let events = baseData.events;
+      let pages = baseData.pages;
+      let calls = baseData.calls;
+      let liveStreams = baseData.liveStreams;
 
       viewer = await fetchMe(activeSession.accessToken);
       const nextSession = { ...activeSession, user: viewer };
       setSession(nextSession);
       writeSession(nextSession);
-      const [profilePayload, chatPayload, connectionPayload, settingsPayload] =
+      const [profilePayload, chatPayload, connectionPayload, settingsPayload, marketplacePayload, eventsPayload, pagesPayload, callsPayload, liveStreamsPayload] =
         await Promise.all([
           fetchProfile(activeSession.accessToken),
           fetchChatThreads(activeSession.accessToken, viewer.id),
           fetchConnections(activeSession.accessToken),
           fetchSettings(activeSession.accessToken),
+          fetchMarketplace(activeSession.accessToken),
+          fetchEvents(),
+          fetchPages(),
+          fetchCalls(activeSession.accessToken),
+          fetchLiveStreams(),
         ]);
       profile = profilePayload;
       chats = chatPayload;
       connections = connectionPayload;
       settings = settingsPayload;
+      marketplace = marketplacePayload;
+      events = eventsPayload;
+      pages = pagesPayload;
+      calls = callsPayload;
+      liveStreams = liveStreamsPayload;
 
       const dashboard = await fetchDashboard(activeSession.accessToken, '');
       setData(
@@ -191,6 +270,11 @@ export function useSocialApp(): SocialAppState {
           connections,
           profile,
           settings,
+          marketplace,
+          events,
+          pages,
+          calls,
+          liveStreams,
         }),
       );
       setLoadError(null);
@@ -198,8 +282,8 @@ export function useSocialApp(): SocialAppState {
       setData(baseData);
       setLoadError(
         error instanceof Error
-          ? `${error.message}. Showing static social preview data instead.`
-          : 'Showing static social preview data instead.',
+          ? error.message
+          : 'Unable to load your social workspace right now.',
       );
     } finally {
       setIsLoading(false);
@@ -244,6 +328,39 @@ export function useSocialApp(): SocialAppState {
         (connection) =>
           includesSearch(connection.user.name, query) || includesSearch(connection.note, query),
       ),
+      marketplace: data.marketplace.filter(
+        (item) =>
+          includesSearch(item.title, query) ||
+          includesSearch(item.description, query) ||
+          includesSearch(item.sellerName, query),
+      ),
+      events: data.events.filter(
+        (item) =>
+          includesSearch(item.title, query) ||
+          includesSearch(item.description, query) ||
+          includesSearch(item.location, query),
+      ),
+      communities: data.communities.filter(
+        (item) =>
+          includesSearch(item.name, query) ||
+          includesSearch(item.description, query) ||
+          item.tags.some((tag) => includesSearch(tag, query)),
+      ),
+      pages: data.pages.filter(
+        (item) =>
+          includesSearch(item.name, query) ||
+          includesSearch(item.description, query) ||
+          includesSearch(item.category, query),
+      ),
+      calls: data.calls.filter(
+        (item) => includesSearch(item.name, query) || includesSearch(item.type, query),
+      ),
+      liveStreams: data.liveStreams.filter(
+        (item) =>
+          includesSearch(item.title, query) ||
+          includesSearch(item.hostName, query) ||
+          includesSearch(item.category, query),
+      ),
     };
   }, [data, searchQuery]);
 
@@ -254,9 +371,19 @@ export function useSocialApp(): SocialAppState {
       return { ok: false, message: 'Enter both email and password.' };
     }
 
-    setAuthMessage('Static preview opened.');
-    await refresh({ silent: true });
-    return { ok: true, message: 'Static preview opened.' };
+    try {
+      const nextSession = await loginApi(email.trim(), password);
+      setSession(nextSession);
+      writeSession(nextSession);
+      setAuthMessage('Signed in successfully.');
+      await refresh({ silent: true });
+      return { ok: true, message: 'Signed in successfully.' };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to sign in right now.';
+      setAuthMessage(message);
+      return { ok: false, message };
+    }
   }
 
   async function register(input: { name: string; email: string; password: string }): Promise<AuthResult> {
@@ -264,9 +391,23 @@ export function useSocialApp(): SocialAppState {
       return { ok: false, message: 'Complete all fields to create an account.' };
     }
 
-    setAuthMessage('Static preview opened.');
-    await refresh({ silent: true });
-    return { ok: true, message: 'Static preview opened.' };
+    try {
+      const nextSession = await signupApi({
+        name: input.name.trim(),
+        email: input.email.trim(),
+        password: input.password,
+      });
+      setSession(nextSession);
+      writeSession(nextSession);
+      setAuthMessage('Account created successfully.');
+      await refresh({ silent: true });
+      return { ok: true, message: 'Account created successfully.' };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to create this account right now.';
+      setAuthMessage(message);
+      return { ok: false, message };
+    }
   }
 
   async function sendResetLink(email: string): Promise<AuthResult> {
@@ -287,23 +428,32 @@ export function useSocialApp(): SocialAppState {
   function logout() {
     setSession(null);
     writeSession(null);
-    const fallback = createMockAppData(createStaticViewer());
+    const fallback = createEmptyData(createEmptyViewer());
     setData(fallback);
-    setSelectedChatId(fallback.chats[0]?.id ?? '');
-    setAuthMessage('Signed out. You are now browsing the static social preview.');
+    setSelectedChatId('');
+    setAuthMessage('Signed out successfully.');
   }
 
   async function createPost(input: { content: string; mediaType: 'text' | 'image' | 'video' }): Promise<AuthResult> {
     if (!input.content.trim()) {
       return { ok: false, message: 'Write something before posting.' };
     }
-    const activeUser = session?.user ?? createStaticViewer();
+    if (!session?.accessToken) {
+      return { ok: false, message: 'Sign in to publish posts.' };
+    }
+    if (input.mediaType !== 'text') {
+      return {
+        ok: false,
+        message: 'Web post attachments are not wired yet. Publish a text update for now.',
+      };
+    }
+    const activeUser = session.user;
 
     const optimisticPost: SocialPost = {
       id: createId('post'),
-      network: input.mediaType === 'text' ? 'x' : input.mediaType === 'image' ? 'instagram' : 'facebook',
+      network: 'x',
       user: activeUser,
-      headline: input.mediaType === 'video' ? 'Video Update' : input.mediaType === 'image' ? 'Visual Post' : 'Fresh Thought',
+      headline: 'Post',
       content: input.content.trim(),
       likes: 0,
       comments: 0,
@@ -311,28 +461,7 @@ export function useSocialApp(): SocialAppState {
       views: 0,
       createdAt: 'Just now',
       tags: input.content.match(/#[a-zA-Z0-9_]+/g)?.map((tag) => tag.replace('#', '')) ?? [],
-      media:
-        input.mediaType === 'text'
-          ? []
-          : [
-              {
-                id: createId('media'),
-                type: input.mediaType,
-                url:
-                  input.mediaType === 'image'
-                    ? 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80'
-                    : 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-                alt: 'New post attachment',
-                poster:
-                  input.mediaType === 'video'
-                    ? 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80'
-                    : undefined,
-              },
-            ],
-      image:
-        input.mediaType === 'image'
-          ? 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80'
-          : undefined,
+      media: [],
       liked: false,
       saved: false,
       visibility: 'public',
@@ -345,14 +474,11 @@ export function useSocialApp(): SocialAppState {
     }));
 
     try {
-      if (session?.accessToken) {
-        await createPostApi(
-          { caption: input.content.trim(), tags: optimisticPost.tags },
-          session.accessToken,
-        );
-        return { ok: true, message: 'Post published.' };
-      }
-      return { ok: true, message: 'Post added in static preview.' };
+      await createPostApi(
+        { caption: input.content.trim(), tags: optimisticPost.tags },
+        session.accessToken,
+      );
+      return { ok: true, message: 'Post published.' };
     } catch (error) {
       setData((current) => ({
         ...current,
@@ -391,7 +517,7 @@ export function useSocialApp(): SocialAppState {
     if (!message.trim()) {
       return;
     }
-    const activeUser = session?.user ?? createStaticViewer();
+    const activeUser = session?.user ?? data.profile.user ?? createEmptyViewer();
 
     updatePost(postId, (post) => ({
       ...post,
@@ -425,7 +551,7 @@ export function useSocialApp(): SocialAppState {
     if (!message.trim()) {
       return;
     }
-    const activeUser = session?.user ?? createStaticViewer();
+    const activeUser = session?.user ?? data.profile.user ?? createEmptyViewer();
 
     setData((current) => ({
       ...current,

@@ -3,6 +3,13 @@ export type ThemeMode = 'light' | 'dark';
 export type AppPage =
   | 'home'
   | 'explore'
+  | 'marketplace'
+  | 'jobs'
+  | 'events'
+  | 'communities'
+  | 'pages'
+  | 'calls'
+  | 'live-streams'
   | 'notifications'
   | 'messages'
   | 'connections'
@@ -94,6 +101,59 @@ export interface CommunityView {
   location: string;
   memberCount: number;
   tags: string[];
+}
+
+export interface MarketplaceItemView {
+  id: string;
+  title: string;
+  description: string;
+  price: string;
+  location: string;
+  status: string;
+  sellerName: string;
+  image?: string;
+  category?: string;
+}
+
+export interface EventView {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  startsAt: string;
+  status: string;
+  attendeeCount: number;
+  image?: string;
+}
+
+export interface PageView {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  followers: number;
+  actionLabel: string;
+  image?: string;
+}
+
+export interface CallView {
+  id: string;
+  name: string;
+  type: string;
+  state: string;
+  time: string;
+  avatarUrl?: string;
+}
+
+export interface LiveStreamView {
+  id: string;
+  title: string;
+  description: string;
+  hostName: string;
+  status: string;
+  viewerCount: number;
+  category: string;
+  image?: string;
 }
 
 export interface TrendView {
@@ -261,15 +321,20 @@ export interface SocialAppData {
   stories: StoryView[];
   posts: SocialPost[];
   reels: ReelView[];
+  marketplace: MarketplaceItemView[];
   suggestions: SuggestionItem[];
   trends: TrendItem[];
   notifications: AppNotification[];
   chats: ChatThread[];
+  calls: CallView[];
+  liveStreams: LiveStreamView[];
   connections: ConnectionItem[];
   explore: ExploreCluster[];
   profile: UserProfile;
   jobs: JobView[];
+  events: EventView[];
   communities: CommunityView[];
+  pages: PageView[];
   settings: SettingsGroup[];
 }
 

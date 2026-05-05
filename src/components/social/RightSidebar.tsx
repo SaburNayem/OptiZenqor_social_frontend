@@ -1,44 +1,103 @@
-import { BriefcaseBusiness, Flame, Radar, Waves } from 'lucide-react';
+import { Circle, MessageSquareMore, Radar, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { SocialAppData } from '../../types';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Avatar } from '../ui/Avatar';
 import { UserSuggestion } from './UserSuggestion';
 
 interface RightSidebarProps {
   data: SocialAppData;
+  selectedChatId: string;
+  onSelectChat: (id: string) => void;
   onToggleSuggestion: (id: string) => void;
 }
 
-export function RightSidebar({ data, onToggleSuggestion }: RightSidebarProps) {
+export function RightSidebar({
+  data,
+  selectedChatId,
+  onSelectChat,
+  onToggleSuggestion,
+}: RightSidebarProps) {
+  const activeChats = data.chats.filter((chat) => chat.online);
+  const recentChats = data.chats.slice(0, 6);
+
   return (
-    <aside className="hidden 2xl:block">
+    <aside className="hidden xl:block">
       <div className="sticky top-24 space-y-4">
         <Card>
           <div className="flex items-center gap-2">
-            <Flame className="h-4 w-4 text-orange-500" />
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Trending now</p>
+            <Users className="h-4 w-4 text-emerald-500" />
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Active people</p>
           </div>
           <div className="mt-4 space-y-3">
-            {data.trends.map((trend) => (
-              <div key={trend.id} className="rounded-[22px] bg-slate-50/80 p-4 dark:bg-slate-950/45">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  {trend.category}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-slate-950 dark:text-white">{trend.topic}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{trend.detail}</p>
-                <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">{trend.volume}</p>
-              </div>
-            ))}
+            {activeChats.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">No one is active right now.</p>
+            ) : (
+              activeChats.map((chat) => (
+                <Link
+                  key={chat.id}
+                  to="/messages"
+                  onClick={() => onSelectChat(chat.id)}
+                  className="flex items-center gap-3 rounded-[22px] bg-slate-50/80 p-3 transition hover:bg-slate-100 dark:bg-slate-950/45 dark:hover:bg-slate-900"
+                >
+                  <div className="relative">
+                    <Avatar src={chat.participant.avatar} alt={chat.participant.name} />
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-950" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                      {chat.participant.name}
+                    </p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {chat.roleLabel}
+                    </p>
+                  </div>
+                  <Circle className="h-3 w-3 fill-emerald-400 text-emerald-400" />
+                </Link>
+              ))
+            )}
           </div>
         </Card>
 
         <Card>
           <div className="flex items-center gap-2">
-            <Radar className="h-4 w-4 text-sky-500" />
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">People to follow</p>
+            <MessageSquareMore className="h-4 w-4 text-sky-500" />
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Quick messages</p>
           </div>
           <div className="mt-4 space-y-3">
-            {data.suggestions.map((suggestion) => (
+            {recentChats.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">No chats yet.</p>
+            ) : (
+              recentChats.map((chat) => (
+                <Link
+                  key={chat.id}
+                  to="/messages"
+                  onClick={() => onSelectChat(chat.id)}
+                  className={`block rounded-[22px] border p-4 transition ${
+                    selectedChatId === chat.id
+                      ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                      : 'border-slate-200/70 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-semibold">{chat.participant.name}</p>
+                    <span className="text-[11px] opacity-70">{chat.lastActive}</span>
+                  </div>
+                  <p className="mt-2 truncate text-sm opacity-80">{chat.preview}</p>
+                </Link>
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center gap-2">
+            <Radar className="h-4 w-4 text-orange-500" />
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Suggested people</p>
+          </div>
+          <div className="mt-4 space-y-3">
+            {data.suggestions.slice(0, 4).map((suggestion) => (
               <UserSuggestion
                 key={suggestion.id}
                 suggestion={suggestion}
@@ -46,42 +105,11 @@ export function RightSidebar({ data, onToggleSuggestion }: RightSidebarProps) {
               />
             ))}
           </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center gap-2">
-            <BriefcaseBusiness className="h-4 w-4 text-emerald-500" />
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Opportunity lane</p>
-          </div>
-          <div className="mt-4 space-y-3">
-            {data.jobs.map((job) => (
-              <div key={job.id} className="rounded-[22px] border border-slate-200/70 p-4 dark:border-slate-800">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">{job.title}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {job.company} · {job.location}
-                </p>
-                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{job.salary}</p>
-              </div>
-            ))}
-            <Button variant="secondary" className="w-full">
-              View roles
+          {data.suggestions.length > 4 ? (
+            <Button variant="secondary" className="mt-4 w-full">
+              View more
             </Button>
-          </div>
-        </Card>
-
-        <Card className="bg-[linear-gradient(135deg,rgba(14,165,233,0.1),rgba(240,249,255,0.8))] dark:bg-[linear-gradient(135deg,rgba(14,165,233,0.18),rgba(15,23,42,0.9))]">
-          <div className="flex items-center gap-2">
-            <Waves className="h-4 w-4 text-sky-500" />
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Community pulse</p>
-          </div>
-          <div className="mt-4 space-y-3">
-            {data.communities.map((community) => (
-              <div key={community.id} className="rounded-[22px] bg-white/70 p-4 dark:bg-slate-900/60">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">{community.name}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{community.description}</p>
-              </div>
-            ))}
-          </div>
+          ) : null}
         </Card>
       </div>
     </aside>
