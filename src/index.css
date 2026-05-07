@@ -22,9 +22,8 @@
     margin: 0;
     min-width: 320px;
     background:
-      radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 24%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 22%),
-      linear-gradient(180deg, #f8fbff 0%, #f3f7fb 46%, #eef4fb 100%);
+      radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 24%),
+      linear-gradient(180deg, #fdfefe 0%, #f8fcfb 48%, #f3faf9 100%);
     color: #0f172a;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -33,9 +32,8 @@
   body.dark,
   .dark body {
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 24%),
-      radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 22%),
-      linear-gradient(180deg, #020617 0%, #0f172a 48%, #111827 100%);
+      radial-gradient(circle at top left, rgba(22, 147, 136, 0.12), transparent 24%),
+      linear-gradient(180deg, #071f1d 0%, #0b2926 48%, #11403c 100%);
     color: #f8fafc;
   }
 
@@ -60,14 +58,14 @@
 @layer components {
   .bg-app {
     background:
-      radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 26%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(239, 246, 255, 0.92));
+      radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 26%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(243, 250, 249, 0.98));
   }
 
   .bg-app-dark {
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.1), transparent 24%),
-      linear-gradient(180deg, rgba(2, 6, 23, 0.94), rgba(15, 23, 42, 0.96));
+      radial-gradient(circle at top left, rgba(22, 147, 136, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(7, 31, 29, 0.96), rgba(11, 41, 38, 0.98));
   }
 
   .section-title {

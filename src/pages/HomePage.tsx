@@ -20,15 +20,23 @@ export function HomePage() {
         </Card>
       ) : null}
 
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {app.data.stories.map((story, index) => (
-          <StoryCard key={story.id} story={story} isSelf={index === 0} />
-        ))}
-      </div>
+      {app.data.stories.length > 0 ? (
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {app.data.stories.map((story, index) => (
+            <StoryCard key={story.id} story={story} isSelf={index === 0} />
+          ))}
+        </div>
+      ) : (
+        <Card className="p-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400">No stories yet.</p>
+        </Card>
+      )}
 
-      <CreatePost viewer={app.session?.user ?? app.data.profile.user} onSubmit={app.createPost} />
+      <section>
+        <CreatePost viewer={app.session?.user ?? app.data.profile.user} onSubmit={app.createPost} />
+      </section>
 
-      <section className="space-y-5">
+      <section className="space-y-4">
         {app.isLoading ? (
           <Card>
             <div className="space-y-3">

@@ -41,10 +41,14 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
       </div>
 
       <div>
-        <p className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-          {post.headline}
+        {post.headline && post.headline.trim() && post.headline.trim().toLowerCase() !== 'post' ? (
+          <p className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+            {post.headline}
+          </p>
+        ) : null}
+        <p className={`${post.headline && post.headline.trim() && post.headline.trim().toLowerCase() !== 'post' ? 'mt-2' : ''} text-sm leading-7 text-slate-600 dark:text-slate-300`}>
+          {post.content}
         </p>
-        <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">{post.content}</p>
         {post.tags.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {post.tags.map((tag) => (

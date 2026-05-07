@@ -4,6 +4,7 @@ import { AuthLayout } from './layouts/AuthLayout';
 import { useSocialApp } from './hooks/useSocialApp';
 import { useTheme } from './hooks/useTheme';
 import { HomePage } from './pages/HomePage';
+import { ReelsPage } from './pages/ReelsPage';
 import { ExplorePage } from './pages/ExplorePage';
 import { MarketplacePage } from './pages/MarketplacePage';
 import { JobsPage } from './pages/JobsPage';
@@ -50,6 +51,7 @@ function App() {
 
         <Route element={<RequireSession context={context} />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/reels" element={<ReelsPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/jobs" element={<JobsPage />} />

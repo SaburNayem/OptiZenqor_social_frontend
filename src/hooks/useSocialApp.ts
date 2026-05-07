@@ -453,7 +453,7 @@ export function useSocialApp(): SocialAppState {
       id: createId('post'),
       network: 'x',
       user: activeUser,
-      headline: 'Post',
+      headline: '',
       content: input.content.trim(),
       likes: 0,
       comments: 0,
@@ -613,6 +613,7 @@ export function useSocialApp(): SocialAppState {
         user: {
           ...current.profile.user,
           ...input,
+          bio: input.about ?? input.bio ?? current.profile.user.bio,
         },
         about: input.about ?? current.profile.about,
         website: input.website ?? current.profile.website,
@@ -626,6 +627,7 @@ export function useSocialApp(): SocialAppState {
         user: {
           ...session.user,
           ...input,
+          bio: input.about ?? input.bio ?? session.user.bio,
         },
       };
       setSession(nextSession);

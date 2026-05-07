@@ -13,13 +13,13 @@ export function SettingsPage() {
       <Card>
         <h1 className="text-3xl font-semibold text-slate-950 dark:text-white">Settings</h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Tune the workspace, privacy posture, and product rhythm to match how you want OptiZenqor Social to feel.
+          Manage appearance and account preferences in one clean place.
         </p>
       </Card>
 
       <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Card>
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">Quick controls</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">Appearance</p>
           <div className="mt-4 space-y-3">
             <Button variant="secondary" className="w-full justify-between" onClick={theme.toggleMode}>
               Toggle theme
@@ -38,7 +38,7 @@ export function SettingsPage() {
             return (
               <Card key={group.title}>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#D6EEEB] text-[#0F766E] dark:bg-[#169388]/15 dark:text-[#A9D9D4]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{group.title}</h2>
