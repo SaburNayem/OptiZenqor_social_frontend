@@ -187,6 +187,16 @@ function normalizeUser(raw: unknown): ViewerUser {
       `https://ui-avatars.com/api/?name=${encodeURIComponent(asText(record.name, 'User'))}&background=0f172a&color=ffffff`,
     bio: asText(record.bio),
     role: capitalize(asText(record.role, 'user')),
+    profileType: ['user', 'creator', 'business'].includes(asText(record.profileType).toLowerCase())
+      ? (asText(record.profileType).toLowerCase() as ViewerUser['profileType'])
+      : undefined,
+    capabilities: isRecord(record.capabilities)
+      ? {
+          canCreateJobs: Boolean(record.capabilities.canCreateJobs),
+          canCreateMarketplaceProducts: Boolean(record.capabilities.canCreateMarketplaceProducts),
+          canCreatePages: Boolean(record.capabilities.canCreatePages),
+        }
+      : undefined,
     verified: Boolean(record.verified),
     followers: asNumber(record.followers),
     following: asNumber(record.following),
@@ -698,6 +708,87 @@ export async function joinCommunity(id: string, token: string) {
     {
       method: 'POST',
       body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function createCommunity(
+  input: { name: string; description: string; category?: string; privacy?: string },
+  token: string,
+) {
+  return request(
+    '/communities',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
+export async function createPage(
+  input: {
+    ownerId: string;
+    name: string;
+    about: string;
+    category: string;
+    location?: string;
+    contactLabel?: string;
+  },
+  token: string,
+) {
+  return request(
+    '/pages/create',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
+export async function createJob(
+  input: {
+    title: string;
+    company: string;
+    location: string;
+    salary: string;
+    type?: string;
+    experienceLevel?: string;
+  },
+  token: string,
+) {
+  return request(
+    '/jobs/create',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
+export async function createMarketplaceProduct(
+  input: {
+    title: string;
+    description: string;
+    price: number;
+    category: string;
+    subcategory: string;
+    sellerId: string;
+    sellerName: string;
+    location: string;
+    condition: string;
+    images?: string[];
+  },
+  token: string,
+) {
+  return request(
+    '/marketplace/products',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
     },
     token,
   );

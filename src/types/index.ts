@@ -26,6 +26,12 @@ export interface ViewerUser {
   avatar: string;
   bio: string;
   role: string;
+  profileType?: 'user' | 'creator' | 'business';
+  capabilities?: {
+    canCreateJobs?: boolean;
+    canCreateMarketplaceProducts?: boolean;
+    canCreatePages?: boolean;
+  };
   verified: boolean;
   followers?: number;
   following?: number;
