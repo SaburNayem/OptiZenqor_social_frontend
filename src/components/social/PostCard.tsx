@@ -11,7 +11,7 @@ interface PostCardProps {
   viewer: ViewerUser | null;
   onLike: (id: string) => void;
   onSave: (id: string) => void;
-  onComment: (id: string, message: string) => void;
+  onComment: (id: string, message: string) => Promise<void>;
 }
 
 export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardProps) {
@@ -135,7 +135,7 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
 
           <div className="flex gap-3">
             <Avatar
-              src={viewer?.avatar ?? 'https://ui-avatars.com/api/?name=Member&background=334155&color=ffffff'}
+              src={viewer?.avatar ?? ''}
               alt={viewer?.name ?? 'Member'}
               size="sm"
             />
@@ -148,8 +148,8 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
               />
               <Button
                 size="sm"
-                onClick={() => {
-                  onComment(post.id, comment);
+                onClick={async () => {
+                  await onComment(post.id, comment);
                   setComment('');
                 }}
                 disabled={!comment.trim()}

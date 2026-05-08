@@ -325,6 +325,7 @@ function normalizeCommunity(raw: unknown): CommunityView {
     location: asText(record.location, 'Global'),
     memberCount: asNumber(record.memberCount),
     tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
+    joined: Boolean(record.joined),
   };
 }
 
@@ -365,19 +366,23 @@ function normalizeEvent(raw: unknown): EventView {
     status: capitalize(asText(record.status, 'approved')),
     attendeeCount: asNumber(record.attendeeCount, asNumber(record.rsvpCount)),
     image: asText(record.image) || asText(record.coverImageUrl),
+    rsvped: Boolean(record.rsvped),
+    saved: Boolean(record.saved),
   };
 }
 
 function normalizePage(raw: unknown): PageView {
   const record = isRecord(raw) ? raw : {};
+  const followed = Boolean(record.followed);
   return {
     id: asText(record.id),
     name: asText(record.name, 'Page'),
     description: asText(record.description, 'No description yet.'),
     category: asText(record.category, 'General'),
     followers: asNumber(record.followers, asNumber(record.followerCount)),
-    actionLabel: asText(record.actionLabel, 'Follow'),
+    actionLabel: asText(record.actionLabel, followed ? 'Following' : 'Follow'),
     image: asText(record.coverImageUrl) || asText(record.avatar),
+    followed,
   };
 }
 
@@ -706,6 +711,17 @@ export async function createPost(input: { caption: string; tags: string[] }, tok
   return payload;
 }
 
+export async function createPostComment(postId: string, message: string, token: string) {
+  return request(
+    `/posts/${postId}/comments`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    },
+    token,
+  );
+}
+
 export async function joinCommunity(id: string, token: string) {
   return request(
     `/communities/${id}/join`,
@@ -731,6 +747,20 @@ export async function createCommunity(
   );
 }
 
+export async function createEvent(
+  input: { title: string; location?: string; date?: string },
+  token: string,
+) {
+  return request(
+    '/events',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
 export async function createPage(
   input: {
     ownerId: string;
@@ -747,6 +777,17 @@ export async function createPage(
     {
       method: 'POST',
       body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
+export async function togglePageFollow(pageId: string, token: string) {
+  return request(
+    `/pages/${pageId}/follow`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({}),
     },
     token,
   );
@@ -801,6 +842,28 @@ export async function createMarketplaceProduct(
 export async function markNotificationRead(id: string, token: string) {
   return request(
     `/notifications/${id}/read`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function toggleEventRsvp(eventId: string, token: string) {
+  return request(
+    `/events/${eventId}/rsvp`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function toggleEventSave(eventId: string, token: string) {
+  return request(
+    `/events/${eventId}/save`,
     {
       method: 'PATCH',
       body: JSON.stringify({}),

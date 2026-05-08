@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   buildExploreClusters,
   createPost as createPostApi,
+  createPostComment as createPostCommentApi,
   fetchCalls,
   fetchDashboard,
   fetchConnections,
@@ -16,13 +17,13 @@ import {
   forgotPassword as forgotPasswordApi,
   login as loginApi,
   markNotificationRead as markNotificationReadApi,
+  joinCommunity as joinCommunityApi,
   sendThreadMessage as sendThreadMessageApi,
   signup as signupApi,
   toggleFollowUser as toggleFollowUserApi,
   updateProfile as updateProfileApi,
 } from '../lib/api';
 import { readSession, writeSession } from '../lib/session';
-import { createId } from '../lib/utils';
 import {
   AppNotification,
   AuthResult,
@@ -449,43 +450,13 @@ export function useSocialApp(): SocialAppState {
         message: 'Web post attachments are not wired yet. Publish a text update for now.',
       };
     }
-    const activeUser = session.user;
-
-    const optimisticPost: SocialPost = {
-      id: createId('post'),
-      network: 'x',
-      user: activeUser,
-      headline: '',
-      content: input.content.trim(),
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      views: 0,
-      createdAt: 'Just now',
-      tags: input.content.match(/#[a-zA-Z0-9_]+/g)?.map((tag) => tag.replace('#', '')) ?? [],
-      media: [],
-      liked: false,
-      saved: false,
-      visibility: 'public',
-      commentsList: [],
-    };
-
-    setData((current) => ({
-      ...current,
-      posts: [optimisticPost, ...current.posts],
-    }));
+    const tags = input.content.match(/#[a-zA-Z0-9_]+/g)?.map((tag) => tag.replace('#', '')) ?? [];
 
     try {
-      await createPostApi(
-        { caption: input.content.trim(), tags: optimisticPost.tags },
-        session.accessToken,
-      );
-      return { ok: true, message: 'Post published.' };
+      await createPostApi({ caption: input.content.trim(), tags }, session.accessToken);
+      await refresh({ silent: true });
+      return { ok: true, message: 'Post published from backend data.' };
     } catch (error) {
-      setData((current) => ({
-        ...current,
-        posts: current.posts.filter((post) => post.id !== optimisticPost.id),
-      }));
       return {
         ok: false,
         message: error instanceof Error ? error.message : 'Unable to publish this post right now.',
@@ -515,25 +486,15 @@ export function useSocialApp(): SocialAppState {
     }));
   }
 
-  function addComment(postId: string, message: string) {
+  async function addComment(postId: string, message: string) {
     if (!message.trim()) {
       return;
     }
-    const activeUser = session?.user ?? data.profile.user ?? createEmptyViewer();
-
-    updatePost(postId, (post) => ({
-      ...post,
-      comments: post.comments + 1,
-      commentsList: [
-        ...post.commentsList,
-        {
-          id: createId('comment'),
-          user: activeUser,
-          message: message.trim(),
-          createdAt: 'Just now',
-        },
-      ],
-    }));
+    if (!session?.accessToken) {
+      return;
+    }
+    await createPostCommentApi(postId, message.trim(), session.accessToken);
+    await refresh({ silent: true });
   }
 
   function markNotificationRead(notificationId: string) {
@@ -549,37 +510,13 @@ export function useSocialApp(): SocialAppState {
     }
   }
 
-  function sendMessage(chatId: string, message: string) {
+  async function sendMessage(chatId: string, message: string) {
     if (!message.trim()) {
       return;
     }
-    const activeUser = session?.user ?? data.profile.user ?? createEmptyViewer();
-
-    setData((current) => ({
-      ...current,
-      chats: current.chats.map((chat) =>
-        chat.id === chatId
-          ? {
-              ...chat,
-              preview: message.trim(),
-              lastActive: 'Just now',
-              messages: [
-                ...chat.messages,
-                {
-                  id: createId('message'),
-                  authorId: activeUser.id,
-                  body: message.trim(),
-                  createdAt: 'Now',
-                  status: 'sent',
-                },
-              ],
-            }
-          : chat,
-      ),
-    }));
-
     if (session?.accessToken) {
-      void sendThreadMessageApi(chatId, message.trim(), session.accessToken).catch(() => undefined);
+      await sendThreadMessageApi(chatId, message.trim(), session.accessToken);
+      await refresh({ silent: true });
     }
   }
 
@@ -601,6 +538,46 @@ export function useSocialApp(): SocialAppState {
     if (session?.accessToken) {
       void toggleFollowUserApi(suggestion.user.id, nextFollowing, session.accessToken).catch(
         () => undefined,
+      );
+    }
+  }
+
+  async function joinCommunity(communityId: string) {
+    if (!session?.accessToken) {
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      communities: current.communities.map((community) =>
+        community.id === communityId
+          ? {
+              ...community,
+              joined: true,
+              memberCount: community.joined ? community.memberCount : community.memberCount + 1,
+            }
+          : community,
+      ),
+    }));
+
+    try {
+      await joinCommunityApi(communityId, session.accessToken);
+      await refresh({ silent: true });
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        communities: current.communities.map((community) =>
+          community.id === communityId
+            ? {
+                ...community,
+                joined: false,
+                memberCount: community.joined ? community.memberCount : Math.max(0, community.memberCount - 1),
+              }
+            : community,
+        ),
+      }));
+      setAuthMessage(
+        error instanceof Error ? error.message : 'Unable to join this community right now.',
       );
     }
   }
@@ -681,6 +658,7 @@ export function useSocialApp(): SocialAppState {
     setSelectedChatId,
     sendMessage,
     toggleFollowSuggestion,
+    joinCommunity,
     updateProfile,
   };
 }

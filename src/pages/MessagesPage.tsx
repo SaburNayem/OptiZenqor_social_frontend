@@ -116,8 +116,8 @@ export function MessagesPage() {
                   className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
                 />
                 <Button
-                  onClick={() => {
-                    app.sendMessage(selectedChat.id, draft);
+                  onClick={async () => {
+                    await app.sendMessage(selectedChat.id, draft);
                     setDraft('');
                   }}
                   disabled={!draft.trim()}

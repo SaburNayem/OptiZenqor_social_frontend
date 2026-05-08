@@ -16,6 +16,7 @@ export function CommunitiesPage() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
 
   async function handleCreateCommunity() {
     if (!app.session?.accessToken || !name.trim() || !description.trim()) {
@@ -38,6 +39,18 @@ export function CommunitiesPage() {
       await app.refresh({ silent: true });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleJoinCommunity(communityId: string) {
+    if (!app.session?.accessToken) {
+      return;
+    }
+    setJoiningId(communityId);
+    try {
+      await app.joinCommunity(communityId);
+    } finally {
+      setJoiningId(null);
     }
   }
 
@@ -83,7 +96,22 @@ export function CommunitiesPage() {
                 </span>
               ))}
             </div>
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{community.memberCount} members</p>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">{community.memberCount} members</p>
+              <Button
+                variant={community.joined ? 'secondary' : 'primary'}
+                onClick={() => void handleJoinCommunity(community.id)}
+                disabled={!app.session?.accessToken || Boolean(community.joined) || joiningId === community.id}
+              >
+                {joiningId === community.id
+                  ? 'Joining...'
+                  : community.joined
+                    ? 'Joined'
+                    : app.session?.accessToken
+                      ? 'Join community'
+                      : 'Login to join'}
+              </Button>
+            </div>
           </Card>
         ))}
       </section>

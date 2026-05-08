@@ -31,7 +31,7 @@ export function CreatePost({ viewer, onSubmit }: CreatePostProps) {
     <Card className="overflow-hidden p-4">
       <div className="flex items-start gap-3">
         <Avatar
-          src={viewer?.avatar ?? 'https://ui-avatars.com/api/?name=Member&background=334155&color=ffffff'}
+          src={viewer?.avatar ?? ''}
           alt={viewer?.name ?? 'Member'}
           size="md"
         />

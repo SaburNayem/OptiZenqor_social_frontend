@@ -107,6 +107,7 @@ export interface CommunityView {
   location: string;
   memberCount: number;
   tags: string[];
+  joined?: boolean;
 }
 
 export interface MarketplaceItemView {
@@ -130,6 +131,8 @@ export interface EventView {
   status: string;
   attendeeCount: number;
   image?: string;
+  rsvped: boolean;
+  saved: boolean;
 }
 
 export interface PageView {
@@ -140,6 +143,7 @@ export interface PageView {
   followers: number;
   actionLabel: string;
   image?: string;
+  followed: boolean;
 }
 
 export interface CallView {
@@ -367,11 +371,15 @@ export interface SocialAppState {
   createPost: (input: { content: string; mediaType: 'text' | 'image' | 'video' }) => Promise<AuthResult>;
   toggleLike: (postId: string) => void;
   toggleSave: (postId: string) => void;
-  addComment: (postId: string, message: string) => void;
+  addComment: (postId: string, message: string) => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   setSelectedChatId: (chatId: string) => void;
-  sendMessage: (chatId: string, message: string) => void;
+  sendMessage: (chatId: string, message: string) => Promise<void>;
   toggleFollowSuggestion: (suggestionId: string) => void;
+  joinCommunity: (communityId: string) => Promise<void>;
+  toggleEventRsvp: (eventId: string) => Promise<void>;
+  toggleEventSave: (eventId: string) => Promise<void>;
+  togglePageFollow: (pageId: string) => Promise<void>;
   updateProfile: (input: Partial<UserProfile['user']> & { about?: string; website?: string; location?: string }) => void;
 }
 
