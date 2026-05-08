@@ -38,12 +38,10 @@ import {
 function createEmptyViewer(overrides: Partial<ViewerUser> = {}): ViewerUser {
   return {
     id: overrides.id ?? '',
-    name: overrides.name ?? 'Member',
-    username: overrides.username ?? 'member',
+    name: overrides.name ?? '',
+    username: overrides.username ?? '',
     email: overrides.email ?? '',
-    avatar:
-      overrides.avatar ??
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(overrides.name ?? 'Member')}&background=0f172a&color=ffffff`,
+    avatar: overrides.avatar ?? '',
     bio: overrides.bio ?? '',
     role: overrides.role ?? 'Member',
     verified: overrides.verified ?? false,
@@ -419,9 +417,13 @@ export function useSocialApp(): SocialAppState {
       await forgotPasswordApi(email.trim());
       setAuthMessage(`Password reset instructions were sent to ${email.trim()}.`);
       return { ok: true, message: 'Reset instructions are ready.' };
-    } catch {
-      setAuthMessage(`Password reset instructions prepared for ${email.trim()}.`);
-      return { ok: true, message: 'Reset instructions are ready.' };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to send password reset instructions right now.';
+      setAuthMessage(message);
+      return { ok: false, message };
     }
   }
 

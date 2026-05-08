@@ -21,10 +21,7 @@ import {
   ViewerUser,
 } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(
-  /\/+$/,
-  '',
-);
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 type JsonRecord = Record<string, unknown>;
 
@@ -127,6 +124,10 @@ function pickObject(payload: unknown) {
 }
 
 function buildNetworkErrorMessage(error: unknown) {
+  if (!API_BASE_URL) {
+    return 'VITE_API_BASE_URL is missing. Configure the public web frontend to point at the backend before loading production data.';
+  }
+
   if (error instanceof TypeError) {
     return `Unable to reach the backend at ${API_BASE_URL}. Make sure the backend is running, the URL is correct, and this web origin is allowed by backend CORS.`;
   }
@@ -135,6 +136,12 @@ function buildNetworkErrorMessage(error: unknown) {
 }
 
 async function request(path: string, init: RequestInit = {}, token?: string) {
+  if (!API_BASE_URL) {
+    throw new Error(
+      'VITE_API_BASE_URL is missing. Configure the public web frontend before making API requests.',
+    );
+  }
+
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
 
@@ -177,14 +184,11 @@ async function request(path: string, init: RequestInit = {}, token?: string) {
 function normalizeUser(raw: unknown): ViewerUser {
   const record = isRecord(raw) ? raw : {};
   return {
-    id: asText(record.id, `user-${Math.random().toString(36).slice(2, 8)}`),
-    name: asText(record.name, 'Unknown User'),
-    username: asText(record.username, 'member'),
+    id: asText(record.id),
+    name: asText(record.name),
+    username: asText(record.username),
     email: asText(record.email),
-    avatar:
-      asText(record.avatar) ||
-      asText(record.avatarUrl) ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(asText(record.name, 'User'))}&background=0f172a&color=ffffff`,
+    avatar: asText(record.avatar) || asText(record.avatarUrl),
     bio: asText(record.bio),
     role: capitalize(asText(record.role, 'user')),
     profileType: ['user', 'creator', 'business'].includes(asText(record.profileType).toLowerCase())
@@ -221,10 +225,10 @@ function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPo
   const record = isRecord(raw) ? raw : {};
   const author = isRecord(record.author) ? normalizeUser(record.author) : usersById.get(asText(record.authorId));
   const user = author ?? {
-    id: asText(record.authorId, 'unknown'),
-    name: 'Unknown User',
-    username: 'unknown',
-    avatar: `https://ui-avatars.com/api/?name=Unknown&background=334155&color=ffffff`,
+    id: asText(record.authorId),
+    name: '',
+    username: '',
+    avatar: '',
     bio: '',
     role: 'User',
     verified: false,
@@ -249,10 +253,10 @@ function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPo
 function normalizeStory(raw: unknown, usersById: Map<string, ViewerUser>, index: number): StoryView {
   const record = isRecord(raw) ? raw : {};
   const user = usersById.get(asText(record.userId)) ?? {
-    id: asText(record.userId, `story-user-${index}`),
-    name: `Creator ${index + 1}`,
-    username: `creator${index + 1}`,
-    avatar: `https://ui-avatars.com/api/?name=Creator+${index + 1}&background=1d9bf0&color=ffffff`,
+    id: asText(record.userId),
+    name: '',
+    username: '',
+    avatar: '',
     bio: '',
     role: 'Creator',
     verified: false,
@@ -266,9 +270,9 @@ function normalizeStory(raw: unknown, usersById: Map<string, ViewerUser>, index:
   ];
 
   return {
-    id: asText(record.id, `story-${index}`),
+    id: asText(record.id),
     title: user.name,
-    subtitle: asText(record.text, 'Story update').slice(0, 40) || 'Fresh story',
+    subtitle: asText(record.text).slice(0, 40),
     accent: accents[index % accents.length],
     media: asText(record.media),
     user,
@@ -887,12 +891,12 @@ export async function sendThreadMessage(threadId: string, text: string, token: s
 }
 
 export async function fetchSettings(token: string) {
-  const payload = await request('/settings', {}, token);
+  const payload = await request('/settings/state', {}, token);
   return normalizeSettings(payload);
 }
 
 export async function fetchMarketplace(token?: string) {
-  const payload = await request('/marketplace', {}, token);
+  const payload = await request('/marketplace/products', {}, token);
   return pickList(payload, ['products', 'items', 'results']).map(normalizeMarketplaceItem);
 }
 
@@ -912,7 +916,7 @@ export async function fetchCalls(token: string) {
 }
 
 export async function fetchLiveStreams() {
-  const payload = await request('/live-stream');
+  const payload = await request('/live-streams');
   return pickList(payload, ['streams', 'items', 'results']).map(normalizeLiveStream);
 }
 
@@ -923,7 +927,7 @@ export async function fetchDashboard(token?: string, searchQuery?: string) {
       request('/feed'),
       request('/stories'),
       request('/reels'),
-      request('/jobs-networking', {}, token),
+      request('/jobs', {}, token),
       request('/communities'),
       request('/trending'),
       request('/notifications', {}, token),
