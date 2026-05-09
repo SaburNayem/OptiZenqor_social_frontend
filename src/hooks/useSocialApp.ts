@@ -218,7 +218,7 @@ function includesSearch(haystack: string, needle: string) {
 export function useSocialApp(): SocialAppState {
   const [session, setSession] = useState<SessionState | null>(() => readSession());
   const [data, setData] = useState<SocialAppData>(() =>
-    createEmptyData(readSession()?.user ?? createEmptyViewer()),
+    createEmptyData(createEmptyViewer()),
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -234,8 +234,7 @@ export function useSocialApp(): SocialAppState {
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const activeSession = readSession();
-    const fallbackViewer = activeSession?.user ?? createEmptyViewer();
-    const baseData = createEmptyData(fallbackViewer);
+    const baseData = createEmptyData(createEmptyViewer());
 
     if (options?.silent) {
       setIsRefreshing(true);
@@ -337,7 +336,7 @@ export function useSocialApp(): SocialAppState {
 
       setLoadError(
         failedSlices.length > 0
-          ? `Some live sections could not be refreshed: ${failedSlices.join(', ')}. Existing backend data was preserved for those areas until the next successful sync.`
+          ? `Some live sections could not be refreshed: ${failedSlices.join(', ')}.`
           : null,
       );
     } catch (error) {
