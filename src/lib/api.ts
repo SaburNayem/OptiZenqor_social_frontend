@@ -51,7 +51,7 @@ function capitalize(value: string) {
 
 function formatRelative(iso: string) {
   if (!iso) {
-    return 'Just now';
+    return '';
   }
 
   const date = new Date(iso);
@@ -179,7 +179,7 @@ function normalizeUser(raw: unknown): ViewerUser {
     email: asText(record.email),
     avatar: asText(record.avatar) || asText(record.avatarUrl),
     bio: asText(record.bio),
-    role: capitalize(asText(record.role, 'user')),
+    role: capitalize(asText(record.role)),
     profileType: ['user', 'creator', 'business'].includes(asText(record.profileType).toLowerCase())
       ? (asText(record.profileType).toLowerCase() as ViewerUser['profileType'])
       : undefined,
@@ -223,7 +223,7 @@ function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPo
     username: '',
     avatar: '',
     bio: '',
-    role: 'User',
+    role: '',
     verified: false,
   };
   const media = toArray(record.media).find((item) => typeof item === 'string');
@@ -231,7 +231,7 @@ function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPo
     id: asText(record.id),
     network: inferNetwork(record, user),
     user,
-    headline: capitalize(asText(record.type, 'post')),
+    headline: capitalize(asText(record.type)),
     content: asText(record.caption),
     image: typeof media === 'string' ? media : undefined,
     likes: asNumber(record.likes, asNumber(record.likeCount)),
@@ -252,7 +252,7 @@ function normalizeStory(raw: unknown, usersById: Map<string, ViewerUser>, index:
     username: '',
     avatar: '',
     bio: '',
-    role: 'Creator',
+    role: '',
     verified: false,
   };
 
@@ -296,7 +296,7 @@ function normalizeJob(raw: unknown): JobView {
     title: asText(record.title),
     company: asText(record.companyName) || asText(record.company),
     location: asText(record.location),
-    type: capitalize(asText(record.type, 'remote')),
+    type: capitalize(asText(record.type)),
     salary: asText(record.salaryLabel) || asText(record.salary),
     postedTime: asText(record.postedTime) || formatRelative(asText(record.createdAt)),
     skills: toArray(record.skills).filter((item): item is string => typeof item === 'string'),
@@ -313,7 +313,7 @@ function normalizeCommunity(raw: unknown): CommunityView {
     name: asText(record.name),
     description: asText(record.description),
     category: asText(record.category),
-    privacy: capitalize(asText(record.privacy, 'public')),
+    privacy: capitalize(asText(record.privacy)),
     location: asText(record.location),
     memberCount: asNumber(record.memberCount),
     tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
@@ -334,7 +334,7 @@ function normalizeMarketplaceItem(raw: unknown): MarketplaceItemView {
       asText(record.price) ||
       (numericPrice !== null ? `$${numericPrice}` : ''),
     location: asText(record.location),
-    status: capitalize(asText(record.status, 'active')),
+    status: capitalize(asText(record.status)),
     sellerName:
       asText(record.sellerName) ||
       asText((record.seller as JsonRecord | undefined)?.name),
@@ -354,7 +354,7 @@ function normalizeEvent(raw: unknown): EventView {
     description: asText(record.description),
     location: asText(record.location),
     startsAt: asText(record.startDate) || asText(record.startsAt) || formatRelative(asText(record.createdAt)),
-    status: capitalize(asText(record.status, 'approved')),
+    status: capitalize(asText(record.status)),
     attendeeCount: asNumber(record.attendeeCount, asNumber(record.rsvpCount)),
     image: asText(record.image) || asText(record.coverImageUrl),
     rsvped: asBoolean(record.rsvped),
@@ -382,8 +382,8 @@ function normalizeCall(raw: unknown): CallView {
   return {
     id: asText(record.id),
     name: asText(record.name),
-    type: capitalize(asText(record.type, 'audio')),
-    state: capitalize(asText(record.state, 'completed')),
+    type: capitalize(asText(record.type)),
+    state: capitalize(asText(record.state)),
     time: formatRelative(asText(record.startedAt) || asText(record.time)),
     avatarUrl: asText(record.avatarUrl),
   };
@@ -397,7 +397,7 @@ function normalizeLiveStream(raw: unknown): LiveStreamView {
     title: asText(record.title),
     description: asText(record.description),
     hostName: asText(host.name) || asText(record.hostName),
-    status: capitalize(asText(record.status, 'scheduled')),
+    status: capitalize(asText(record.status)),
     viewerCount: asNumber(record.viewerCount),
     category: asText(record.category),
     image: asText(record.previewImageUrl),
@@ -432,7 +432,7 @@ function normalizeSearchItem(raw: unknown): SearchItemView {
   const record = isRecord(raw) ? raw : {};
   return {
     id: asText(record.id),
-    type: asText(record.type, 'result'),
+    type: asText(record.type),
     title: asText(record.title),
     subtitle: asText(record.description) || asText(record.caption) || asText(record.name),
     image: asText(record.imageUrl) || asText(record.avatar),
@@ -465,7 +465,7 @@ function firstBoolean(value: unknown): boolean | null {
 
 function formatChatTime(iso: string) {
   if (!iso) {
-    return 'Now';
+    return '';
   }
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
@@ -474,9 +474,9 @@ function formatChatTime(iso: string) {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function normalizeProfile(raw: unknown, fallbackUser?: ViewerUser): UserProfile {
+function normalizeProfile(raw: unknown): UserProfile {
   const record = pickObject(raw);
-  const user = normalizeUser((record as JsonRecord).user ?? fallbackUser ?? {});
+  const user = normalizeUser((record as JsonRecord).user ?? {});
   const stats = isRecord((record as JsonRecord).stats) ? ((record as JsonRecord).stats as JsonRecord) : {};
   const recentPosts = pickList(record, 'recentPosts').length;
 
@@ -574,7 +574,9 @@ function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]
     roleLabel: participant.role || asText(record.participantsLabel),
     preview: lastMessage?.body || asText((record.lastMessage as JsonRecord | undefined)?.text) || asText(record.summary),
     unreadCount: asNumber(record.unreadCount),
-    lastActive: lastMessage?.createdAt || 'Now',
+    lastActive:
+      lastMessage?.createdAt ||
+      formatChatTime(asText(record.updatedAt) || asText(record.lastMessageAt) || asText(record.createdAt)),
     online: false,
     messages: normalizedMessages,
   };
@@ -951,7 +953,7 @@ export async function toggleEventSave(eventId: string, token: string) {
 export async function fetchBookmarkIds(token: string) {
   const payload = await request('/bookmarks', {}, token);
   return pickList(payload, 'bookmarks')
-    .filter((item) => isRecord(item) && asText(item.type, 'post') === 'post')
+    .filter((item) => isRecord(item) && asText(item.type) === 'post')
     .map((item) => asText((item as JsonRecord).id))
     .filter(Boolean);
 }

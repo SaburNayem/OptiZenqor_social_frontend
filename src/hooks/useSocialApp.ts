@@ -52,7 +52,7 @@ function createEmptyViewer(overrides: Partial<ViewerUser> = {}): ViewerUser {
     email: overrides.email ?? '',
     avatar: overrides.avatar ?? '',
     bio: overrides.bio ?? '',
-    role: overrides.role ?? 'Member',
+    role: overrides.role ?? '',
     verified: overrides.verified ?? false,
     followers: overrides.followers ?? 0,
     following: overrides.following ?? 0,
