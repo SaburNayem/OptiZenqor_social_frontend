@@ -134,7 +134,7 @@ function makeNotification(notification: DashboardData['notifications'][number]):
 
 function mergeDashboardIntoData(
   base: SocialAppData,
-  dashboard: DashboardData,
+  dashboard: DashboardData | null,
   viewer: ViewerUser,
   extras?: {
     savedPostIds?: string[];
@@ -149,18 +149,20 @@ function mergeDashboardIntoData(
     liveStreams?: SocialAppData['liveStreams'];
   },
 ): SocialAppData {
-  const explore = buildExploreClusters({
-    search: dashboard.search,
-    trends: dashboard.trends,
-    jobs: dashboard.jobs,
-    communities: dashboard.communities,
-  });
+  const explore = dashboard
+    ? buildExploreClusters({
+        search: dashboard.search,
+        trends: dashboard.trends,
+        jobs: dashboard.jobs,
+        communities: dashboard.communities,
+      })
+    : base.explore;
 
   return {
     ...base,
-    stories: dashboard.stories.length > 0 ? dashboard.stories : base.stories,
+    stories: dashboard?.stories ?? base.stories,
     posts:
-      dashboard.posts.length > 0
+      dashboard?.posts
         ? dashboard.posts.map((post) =>
             makeFeedPost({
               ...post,
@@ -170,9 +172,9 @@ function mergeDashboardIntoData(
             }),
           )
         : base.posts,
-    reels: dashboard.reels.length > 0 ? dashboard.reels : base.reels,
+    reels: dashboard?.reels ?? base.reels,
     suggestions:
-      dashboard.userSuggestions.length > 0
+      dashboard?.userSuggestions
         ? dashboard.userSuggestions.map((user) => ({
             id: `suggestion-api-${user.id}`,
             user,
@@ -181,18 +183,18 @@ function mergeDashboardIntoData(
           }))
         : base.suggestions,
     trends:
-      dashboard.trends.length > 0
+      dashboard?.trends
         ? dashboard.trends.map((trend) => ({ ...trend, category: 'Live' }))
         : base.trends,
     notifications:
-      dashboard.notifications.length > 0
+      dashboard?.notifications
         ? dashboard.notifications.map(makeNotification)
         : base.notifications,
-    chats: extras?.chats?.length ? extras.chats : base.chats,
-    calls: extras?.calls?.length ? extras.calls : base.calls,
-    liveStreams: extras?.liveStreams?.length ? extras.liveStreams : base.liveStreams,
-    connections: extras?.connections?.length ? extras.connections : base.connections,
-    explore: explore.length > 0 ? explore : base.explore,
+    chats: extras?.chats ?? base.chats,
+    calls: extras?.calls ?? base.calls,
+    liveStreams: extras?.liveStreams ?? base.liveStreams,
+    connections: extras?.connections ?? base.connections,
+    explore,
     profile: extras?.profile ?? {
       ...base.profile,
       user: {
@@ -200,12 +202,12 @@ function mergeDashboardIntoData(
         ...viewer,
       },
     },
-    jobs: dashboard.jobs.length > 0 ? dashboard.jobs : base.jobs,
-    marketplace: extras?.marketplace?.length ? extras.marketplace : base.marketplace,
-    events: extras?.events?.length ? extras.events : base.events,
-    communities: dashboard.communities.length > 0 ? dashboard.communities : base.communities,
-    pages: extras?.pages?.length ? extras.pages : base.pages,
-    settings: extras?.settings?.length ? extras.settings : base.settings,
+    jobs: dashboard?.jobs ?? base.jobs,
+    marketplace: extras?.marketplace ?? base.marketplace,
+    events: extras?.events ?? base.events,
+    communities: dashboard?.communities ?? base.communities,
+    pages: extras?.pages ?? base.pages,
+    settings: extras?.settings ?? base.settings,
   };
 }
 
@@ -287,46 +289,14 @@ export function useSocialApp(): SocialAppState {
           ? bookmarkIdsResult.value
           : currentDataSnapshot.posts.filter((post) => post.saved).map((post) => post.id);
 
-      const dashboard =
-        dashboardResult.status === 'fulfilled'
-          ? dashboardResult.value
-          : {
-              userSuggestions: [],
-              stories: currentDataSnapshot.stories,
-              posts: currentDataSnapshot.posts,
-              reels: currentDataSnapshot.reels,
-              jobs: currentDataSnapshot.jobs,
-              communities: currentDataSnapshot.communities,
-              trends: currentDataSnapshot.trends,
-              notifications: currentDataSnapshot.notifications,
-              search: currentDataSnapshot.explore.map((item) => ({
-                id: item.id,
-                type: 'explore',
-                title: item.title,
-                subtitle: item.description,
-                image: item.image,
-              })),
-              stats: {
-                posts: currentDataSnapshot.posts.length,
-                stories: currentDataSnapshot.stories.length,
-                reels: currentDataSnapshot.reels.length,
-                communities: currentDataSnapshot.communities.length,
-                jobs: currentDataSnapshot.jobs.length,
-                notifications: currentDataSnapshot.notifications.length,
-              },
-            };
+      const dashboard = dashboardResult.status === 'fulfilled' ? dashboardResult.value : null;
 
       setData(
         mergeDashboardIntoData(currentDataSnapshot, dashboard, viewer, {
           savedPostIds,
-          chats:
-            chatsResult.status === 'fulfilled'
-              ? chatsResult.value
-              : currentDataSnapshot.chats,
+          chats: chatsResult.status === 'fulfilled' ? chatsResult.value : undefined,
           connections:
-            connectionsResult.status === 'fulfilled'
-              ? connectionsResult.value
-              : currentDataSnapshot.connections,
+            connectionsResult.status === 'fulfilled' ? connectionsResult.value : undefined,
           profile:
             profileResult.status === 'fulfilled'
               ? profileResult.value
@@ -334,30 +304,18 @@ export function useSocialApp(): SocialAppState {
                   ...currentDataSnapshot.profile,
                   user: viewer,
                 },
-          settings:
-            settingsResult.status === 'fulfilled'
-              ? settingsResult.value
-              : currentDataSnapshot.settings,
+          settings: settingsResult.status === 'fulfilled' ? settingsResult.value : undefined,
           marketplace:
             marketplaceResult.status === 'fulfilled'
               ? marketplaceResult.value
-              : currentDataSnapshot.marketplace,
-          events:
-            eventsResult.status === 'fulfilled'
-              ? eventsResult.value
-              : currentDataSnapshot.events,
-          pages:
-            pagesResult.status === 'fulfilled'
-              ? pagesResult.value
-              : currentDataSnapshot.pages,
-          calls:
-            callsResult.status === 'fulfilled'
-              ? callsResult.value
-              : currentDataSnapshot.calls,
+              : undefined,
+          events: eventsResult.status === 'fulfilled' ? eventsResult.value : undefined,
+          pages: pagesResult.status === 'fulfilled' ? pagesResult.value : undefined,
+          calls: callsResult.status === 'fulfilled' ? callsResult.value : undefined,
           liveStreams:
             liveStreamsResult.status === 'fulfilled'
               ? liveStreamsResult.value
-              : currentDataSnapshot.liveStreams,
+              : undefined,
         }),
       );
 
@@ -379,7 +337,7 @@ export function useSocialApp(): SocialAppState {
 
       setLoadError(
         failedSlices.length > 0
-          ? `Some live sections could not be refreshed: ${failedSlices.join(', ')}. Showing the latest available backend-backed data for those areas.`
+          ? `Some live sections could not be refreshed: ${failedSlices.join(', ')}. Existing backend data was preserved for those areas until the next successful sync.`
           : null,
       );
     } catch (error) {

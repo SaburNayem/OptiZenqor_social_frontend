@@ -21,6 +21,26 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import {
+  AccountSwitchingPage,
+  ActivitySessionsPage,
+  ArchiveCenterPage,
+  BlockedUsersPage,
+  BookmarksPage,
+  CreatorToolsPage,
+  DraftsPage,
+  GroupChatPage,
+  GroupsPage,
+  InviteReferralPage,
+  PremiumMembershipPage,
+  SavedCollectionsPage,
+  SchedulingPage,
+  SubscriptionsPage,
+  SupportHelpPage,
+  UploadManagerPage,
+  VerificationRequestPage,
+  WalletPaymentsPage,
+} from './pages/AppParityPages';
 import { AppOutletContext } from './types';
 
 function RequireSession({ context }: { context: AppOutletContext }) {
@@ -63,6 +83,24 @@ function App() {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
+          <Route path="/bookmarks" element={<BookmarksPage />} />
+          <Route path="/saved-collections" element={<SavedCollectionsPage />} />
+          <Route path="/drafts" element={<DraftsPage />} />
+          <Route path="/scheduling" element={<SchedulingPage />} />
+          <Route path="/upload-manager" element={<UploadManagerPage />} />
+          <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/group-chat" element={<GroupChatPage />} />
+          <Route path="/creator-tools" element={<CreatorToolsPage />} />
+          <Route path="/wallet" element={<WalletPaymentsPage />} />
+          <Route path="/premium" element={<PremiumMembershipPage />} />
+          <Route path="/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/support" element={<SupportHelpPage />} />
+          <Route path="/verification" element={<VerificationRequestPage />} />
+          <Route path="/activity-sessions" element={<ActivitySessionsPage />} />
+          <Route path="/account-switching" element={<AccountSwitchingPage />} />
+          <Route path="/blocked-users" element={<BlockedUsersPage />} />
+          <Route path="/invite-referral" element={<InviteReferralPage />} />
+          <Route path="/archive" element={<ArchiveCenterPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

@@ -41,6 +41,10 @@ function asNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+function asBoolean(value: unknown, fallback = false) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
 function capitalize(value: string) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }
@@ -74,53 +78,38 @@ function formatRelative(iso: string) {
   return date.toLocaleDateString();
 }
 
-function pickList(payload: unknown, aliases: string[] = []) {
+function getDataNode(payload: unknown) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  return payload.data ?? null;
+}
+
+function pickList(payload: unknown, key?: string) {
   if (Array.isArray(payload)) {
     return payload;
   }
-  if (!isRecord(payload)) {
-    return [];
+
+  const data = getDataNode(payload);
+  if (Array.isArray(data)) {
+    return data;
   }
-
-  const candidates = [
-    payload.data,
-    payload.items,
-    payload.results,
-    payload.posts,
-    payload.stories,
-    payload.reels,
-    payload.jobs,
-    payload.communities,
-    payload.notifications,
-    ...aliases.map((alias) => payload[alias]),
-  ];
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate;
-    }
-    if (isRecord(candidate)) {
-      for (const alias of aliases) {
-        if (Array.isArray(candidate[alias])) {
-          return candidate[alias] as unknown[];
-        }
-      }
-      for (const key of ['items', 'results', 'posts', 'stories', 'reels', 'jobs', 'communities']) {
-        if (Array.isArray(candidate[key])) {
-          return candidate[key] as unknown[];
-        }
-      }
-    }
+  if (key && isRecord(data) && Array.isArray(data[key])) {
+    return data[key] as unknown[];
+  }
+  if (key && isRecord(payload) && Array.isArray(payload[key])) {
+    return payload[key] as unknown[];
   }
 
   return [];
 }
 
 function pickObject(payload: unknown) {
-  if (!isRecord(payload)) {
-    return {};
+  const data = getDataNode(payload);
+  if (isRecord(data)) {
+    return data;
   }
-  return isRecord(payload.data) ? payload.data : payload;
+  return isRecord(payload) ? payload : {};
 }
 
 function buildNetworkErrorMessage(error: unknown) {
@@ -196,14 +185,18 @@ function normalizeUser(raw: unknown): ViewerUser {
       : undefined,
     capabilities: isRecord(record.capabilities)
       ? {
-          canCreateJobs: Boolean(record.capabilities.canCreateJobs),
-          canCreateMarketplaceProducts: Boolean(record.capabilities.canCreateMarketplaceProducts),
-          canCreatePages: Boolean(record.capabilities.canCreatePages),
+          canCreateJobs: asBoolean(record.capabilities.canCreateJobs),
+          canCreateMarketplaceProducts: asBoolean(record.capabilities.canCreateMarketplaceProducts),
+          canCreatePages: asBoolean(record.capabilities.canCreatePages),
         }
       : undefined,
-    verified: Boolean(record.verified),
+    verified: asBoolean(record.verified),
     followers: asNumber(record.followers),
     following: asNumber(record.following),
+    location: asText(record.location),
+    website: asText(record.website),
+    coverImage: asText(record.coverImageUrl) || asText(record.coverImage),
+    headline: asText(record.headline),
   };
 }
 
@@ -241,13 +234,13 @@ function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPo
     headline: capitalize(asText(record.type, 'post')),
     content: asText(record.caption),
     image: typeof media === 'string' ? media : undefined,
-    likes: asNumber(record.likes),
-    comments: asNumber(record.comments),
-    shares: asNumber(record.shares),
-    views: asNumber(record.views),
+    likes: asNumber(record.likes, asNumber(record.likeCount)),
+    comments: asNumber(record.comments, asNumber(record.commentCount)),
+    shares: asNumber(record.shares, asNumber(record.shareCount)),
+    views: asNumber(record.views, asNumber(record.viewCount)),
     createdAt: formatRelative(asText(record.createdAt)),
     tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
-    saved: Boolean(record.saved),
+    saved: asBoolean(record.saved),
   };
 }
 
@@ -285,12 +278,12 @@ function normalizeReel(raw: unknown): ReelView {
   const user = isRecord(record.author) ? normalizeUser(record.author) : normalizeUser({});
   return {
     id: asText(record.id),
-    caption: asText(record.caption, 'Untitled reel'),
+    caption: asText(record.caption),
     thumbnail: asText(record.thumbnail) || asText(record.coverImageUrl) || undefined,
-    audioName: asText(record.audioName, 'Original audio'),
-    likes: asNumber(record.likes),
-    comments: asNumber(record.comments),
-    shares: asNumber(record.shares),
+    audioName: asText(record.audioName),
+    likes: asNumber(record.likes, asNumber(record.likeCount)),
+    comments: asNumber(record.comments, asNumber(record.commentCount)),
+    shares: asNumber(record.shares, asNumber(record.shareCount)),
     createdAt: formatRelative(asText(record.createdAt)),
     user,
   };
@@ -300,16 +293,16 @@ function normalizeJob(raw: unknown): JobView {
   const record = isRecord(raw) ? raw : {};
   return {
     id: asText(record.id),
-    title: asText(record.title, 'Open role'),
-    company: asText(record.companyName) || asText(record.company, 'Confidential'),
-    location: asText(record.location, 'Remote'),
+    title: asText(record.title),
+    company: asText(record.companyName) || asText(record.company),
+    location: asText(record.location),
     type: capitalize(asText(record.type, 'remote')),
-    salary: asText(record.salaryLabel) || asText(record.salary, 'Compensation not listed'),
+    salary: asText(record.salaryLabel) || asText(record.salary),
     postedTime: asText(record.postedTime) || formatRelative(asText(record.createdAt)),
     skills: toArray(record.skills).filter((item): item is string => typeof item === 'string'),
-    featured: Boolean(record.featured),
-    saved: Boolean(record.saved),
-    applied: Boolean(record.applied),
+    featured: asBoolean(record.featured),
+    saved: asBoolean(record.saved),
+    applied: asBoolean(record.applied),
   };
 }
 
@@ -317,14 +310,14 @@ function normalizeCommunity(raw: unknown): CommunityView {
   const record = isRecord(raw) ? raw : {};
   return {
     id: asText(record.id),
-    name: asText(record.name, 'Community'),
-    description: asText(record.description, 'No description yet.'),
-    category: asText(record.category, 'General'),
+    name: asText(record.name),
+    description: asText(record.description),
+    category: asText(record.category),
     privacy: capitalize(asText(record.privacy, 'public')),
-    location: asText(record.location, 'Global'),
+    location: asText(record.location),
     memberCount: asNumber(record.memberCount),
     tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
-    joined: Boolean(record.joined),
+    joined: asBoolean(record.joined),
   };
 }
 
@@ -334,18 +327,17 @@ function normalizeMarketplaceItem(raw: unknown): MarketplaceItemView {
   const numericPrice = typeof priceValue === 'number' ? priceValue : null;
   return {
     id: asText(record.id),
-    title: asText(record.title, 'Marketplace item'),
-    description: asText(record.description, 'No description yet.'),
+    title: asText(record.title),
+    description: asText(record.description),
     price:
       asText(record.priceLabel) ||
       asText(record.price) ||
-      (numericPrice !== null ? `$${numericPrice}` : 'Price on request'),
-    location: asText(record.location, 'Location not set'),
+      (numericPrice !== null ? `$${numericPrice}` : ''),
+    location: asText(record.location),
     status: capitalize(asText(record.status, 'active')),
     sellerName:
       asText(record.sellerName) ||
-      asText((record.seller as JsonRecord | undefined)?.name) ||
-      'Seller',
+      asText((record.seller as JsonRecord | undefined)?.name),
     image:
       asText(record.image) ||
       asText(record.thumbnail) ||
@@ -358,26 +350,26 @@ function normalizeEvent(raw: unknown): EventView {
   const record = isRecord(raw) ? raw : {};
   return {
     id: asText(record.id),
-    title: asText(record.title, 'Event'),
-    description: asText(record.description, 'Event details will appear here.'),
-    location: asText(record.location, 'Online'),
+    title: asText(record.title),
+    description: asText(record.description),
+    location: asText(record.location),
     startsAt: asText(record.startDate) || asText(record.startsAt) || formatRelative(asText(record.createdAt)),
     status: capitalize(asText(record.status, 'approved')),
     attendeeCount: asNumber(record.attendeeCount, asNumber(record.rsvpCount)),
     image: asText(record.image) || asText(record.coverImageUrl),
-    rsvped: Boolean(record.rsvped),
-    saved: Boolean(record.saved),
+    rsvped: asBoolean(record.rsvped),
+    saved: asBoolean(record.saved),
   };
 }
 
 function normalizePage(raw: unknown): PageView {
   const record = isRecord(raw) ? raw : {};
-  const followed = Boolean(record.followed);
+  const followed = asBoolean(record.followed);
   return {
     id: asText(record.id),
-    name: asText(record.name, 'Page'),
-    description: asText(record.description, 'No description yet.'),
-    category: asText(record.category, 'General'),
+    name: asText(record.name),
+    description: asText(record.description),
+    category: asText(record.category),
     followers: asNumber(record.followers, asNumber(record.followerCount)),
     actionLabel: asText(record.actionLabel, followed ? 'Following' : 'Follow'),
     image: asText(record.coverImageUrl) || asText(record.avatar),
@@ -389,7 +381,7 @@ function normalizeCall(raw: unknown): CallView {
   const record = isRecord(raw) ? raw : {};
   return {
     id: asText(record.id),
-    name: asText(record.name, 'Call'),
+    name: asText(record.name),
     type: capitalize(asText(record.type, 'audio')),
     state: capitalize(asText(record.state, 'completed')),
     time: formatRelative(asText(record.startedAt) || asText(record.time)),
@@ -402,12 +394,12 @@ function normalizeLiveStream(raw: unknown): LiveStreamView {
   const host = isRecord(record.host) ? record.host : {};
   return {
     id: asText(record.id),
-    title: asText(record.title, 'Live stream'),
-    description: asText(record.description, 'Live session in progress.'),
-    hostName: asText(host.name) || asText(record.hostName, 'Host'),
+    title: asText(record.title),
+    description: asText(record.description),
+    hostName: asText(host.name) || asText(record.hostName),
     status: capitalize(asText(record.status, 'scheduled')),
     viewerCount: asNumber(record.viewerCount),
-    category: asText(record.category, 'Live'),
+    category: asText(record.category),
     image: asText(record.previewImageUrl),
   };
 }
@@ -417,12 +409,9 @@ function normalizeTrend(raw: unknown): TrendView {
   const payload = isRecord(record.payload) ? record.payload : {};
   return {
     id: asText(record.id) || asText(payload.id) || asText(record.title),
-    topic: `#${asText(record.title, 'Trending').replace(/^#/, '').replace(/\s+/g, '')}`,
-    detail:
-      asText(payload.description) ||
-      asText(payload.caption) ||
-      `${capitalize(asText(record.type, 'item'))} is performing strongly right now.`,
-    volume: `${Math.max(1, Math.round(asNumber(record.score, 1)))} trend score`,
+    topic: `#${asText(record.title).replace(/^#/, '').replace(/\s+/g, '')}`,
+    detail: asText(payload.description) || asText(payload.caption),
+    volume: `${Math.max(0, Math.round(asNumber(record.score, 0)))} trend score`,
   };
 }
 
@@ -430,10 +419,10 @@ function normalizeNotification(raw: unknown): NotificationView {
   const record = isRecord(raw) ? raw : {};
   return {
     id: asText(record.id),
-    title: asText(record.title, 'New activity'),
-    body: asText(record.body, 'Something changed in your network.'),
+    title: asText(record.title),
+    body: asText(record.body),
     createdAt: formatRelative(asText(record.createdAt)),
-    unread: Boolean(record.unread),
+    unread: asBoolean(record.unread),
     entityType: asText(record.entityType),
     actorName: asText(record.actorName),
   };
@@ -444,7 +433,7 @@ function normalizeSearchItem(raw: unknown): SearchItemView {
   return {
     id: asText(record.id),
     type: asText(record.type, 'result'),
-    title: asText(record.title, 'Untitled'),
+    title: asText(record.title),
     subtitle: asText(record.description) || asText(record.caption) || asText(record.name),
     image: asText(record.imageUrl) || asText(record.avatar),
   };
@@ -489,16 +478,16 @@ function normalizeProfile(raw: unknown, fallbackUser?: ViewerUser): UserProfile 
   const record = pickObject(raw);
   const user = normalizeUser((record as JsonRecord).user ?? fallbackUser ?? {});
   const stats = isRecord((record as JsonRecord).stats) ? ((record as JsonRecord).stats as JsonRecord) : {};
-  const recentPosts = pickList(record, ['recentPosts']).length;
+  const recentPosts = pickList(record, 'recentPosts').length;
 
   return {
     user,
     coverImage: user.coverImage || asText((record as JsonRecord).coverImage),
-    headline: user.headline || asText((record as JsonRecord).headline) || user.bio || 'Profile overview',
-    about: user.bio || asText((record as JsonRecord).about) || 'No bio added yet.',
-    location: user.location || 'Global',
+    headline: user.headline || asText((record as JsonRecord).headline) || user.bio,
+    about: user.bio || asText((record as JsonRecord).about),
+    location: user.location || '',
     website: user.website || '',
-    joinedLabel: asText((record as JsonRecord).joinedLabel, 'Joined recently'),
+    joinedLabel: asText((record as JsonRecord).joinedLabel),
     skills: toArray((record as JsonRecord).skills).filter((item): item is string => typeof item === 'string'),
     metrics: [
       { label: 'Followers', value: String(asNumber(stats.followers, user.followers ?? 0)) },
@@ -522,7 +511,7 @@ function normalizeProfile(raw: unknown, fallbackUser?: ViewerUser): UserProfile 
       {
         id: 'profile-bio',
         label: 'Bio',
-        value: user.bio || 'No bio yet',
+        value: user.bio || '',
         description: 'Profile summary visible in the app.',
       },
     ],
@@ -535,19 +524,19 @@ function normalizeConnection(raw: unknown, relationship: ConnectionItem['relatio
     id: `connection-${relationship}-${user.id}`,
     user,
     relationship,
-    note: user.bio || `${user.role} in your Socity network.`,
-    sharedTags: [user.role, user.location || 'Global'].filter(Boolean),
+    note: user.bio || user.role,
+    sharedTags: [user.role, user.location || ''].filter(Boolean),
   };
 }
 
 function normalizeSettings(raw: unknown): SettingsGroup[] {
   return pickList(raw).map((section) => {
     const record = isRecord(section) ? section : {};
-    const items = pickList(record, ['items']).map((item) => {
+    const items = pickList(record, 'items').map((item) => {
       const itemRecord = isRecord(item) ? item : {};
       return {
         id: asText(itemRecord.key) || asText(itemRecord.id),
-        title: asText(itemRecord.title, 'Setting'),
+        title: asText(itemRecord.title),
         description: asText(itemRecord.subtitle) || asText((itemRecord.data as JsonRecord | undefined)?.description),
         enabled: firstBoolean((itemRecord.data as JsonRecord | undefined)?.state ?? itemRecord.data) ?? false,
       };
@@ -555,7 +544,7 @@ function normalizeSettings(raw: unknown): SettingsGroup[] {
 
     return {
       id: asText(record.key) || asText(record.id),
-      title: asText(record.title, 'Settings'),
+      title: asText(record.title),
       items,
     };
   });
@@ -563,7 +552,7 @@ function normalizeSettings(raw: unknown): SettingsGroup[] {
 
 function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]): ChatThread {
   const record = isRecord(raw) ? raw : {};
-  const participants = pickList(record, ['participants']).map(normalizeUser);
+  const participants = pickList(record, 'participants').map(normalizeUser);
   const participant =
     participants.find((item) => item.id !== viewerId) ??
     participants[0] ??
@@ -582,7 +571,7 @@ function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]
   return {
     id: asText(record.id),
     participant,
-    roleLabel: participant.role || asText(record.participantsLabel, 'Conversation'),
+    roleLabel: participant.role || asText(record.participantsLabel),
     preview: lastMessage?.body || asText((record.lastMessage as JsonRecord | undefined)?.text) || asText(record.summary),
     unreadCount: asNumber(record.unreadCount),
     lastActive: lastMessage?.createdAt || 'Now',
@@ -961,7 +950,7 @@ export async function toggleEventSave(eventId: string, token: string) {
 
 export async function fetchBookmarkIds(token: string) {
   const payload = await request('/bookmarks', {}, token);
-  return pickList(payload, ['bookmarks', 'items', 'results'])
+  return pickList(payload, 'bookmarks')
     .filter((item) => isRecord(item) && asText(item.type, 'post') === 'post')
     .map((item) => asText((item as JsonRecord).id))
     .filter(Boolean);
@@ -1050,12 +1039,12 @@ export async function toggleFollowUser(id: string, shouldFollow: boolean, token:
 
 export async function fetchChatThreads(token: string, viewerId: string) {
   const payload = await request('/chat/threads', {}, token);
-  const threads = pickList(payload, ['threads']);
+  const threads = pickList(payload, 'threads');
   const withMessages = await Promise.all(
     threads.map(async (thread) => {
       const id = asText((thread as JsonRecord).id);
       const messagesPayload = await request(`/chat/threads/${id}/messages`, {}, token);
-      const messages = pickList(messagesPayload, ['messages']);
+      const messages = pickList(messagesPayload, 'messages');
       return normalizeChatThread(thread, viewerId, messages);
     }),
   );
@@ -1080,27 +1069,27 @@ export async function fetchSettings(token: string) {
 
 export async function fetchMarketplace(token?: string) {
   const payload = await request('/marketplace/products', {}, token);
-  return pickList(payload, ['products', 'items', 'results']).map(normalizeMarketplaceItem);
+  return pickList(payload, 'products').map(normalizeMarketplaceItem);
 }
 
 export async function fetchEvents() {
   const payload = await request('/events');
-  return pickList(payload, ['events', 'items', 'results']).map(normalizeEvent);
+  return pickList(payload, 'events').map(normalizeEvent);
 }
 
 export async function fetchPages() {
   const payload = await request('/pages');
-  return pickList(payload, ['pages', 'items', 'results']).map(normalizePage);
+  return pickList(payload, 'pages').map(normalizePage);
 }
 
 export async function fetchCalls(token: string) {
   const payload = await request('/calls', {}, token);
-  return pickList(payload, ['calls', 'items', 'results']).map(normalizeCall);
+  return pickList(payload, 'calls').map(normalizeCall);
 }
 
 export async function fetchLiveStreams() {
   const payload = await request('/live-streams');
-  return pickList(payload, ['streams', 'items', 'results']).map(normalizeLiveStream);
+  return pickList(payload, 'streams').map(normalizeLiveStream);
 }
 
 export async function fetchDashboard(token?: string, searchQuery?: string) {
@@ -1116,33 +1105,29 @@ export async function fetchDashboard(token?: string, searchQuery?: string) {
       request('/notifications', {}, token),
       searchQuery?.trim()
         ? request(`/search-discovery?q=${encodeURIComponent(searchQuery.trim())}&limit=8`)
-        : Promise.resolve({ results: [] }),
+        : Promise.resolve({ data: { results: [] } }),
     ]);
 
   const users = pickList(usersPayload).map(normalizeUser);
   const usersById = new Map(users.map((user) => [user.id, user]));
 
-  const posts = pickList(feedPayload, ['posts']).map((item) => normalizePost(item, usersById));
-  const stories = pickList(storiesPayload, ['stories']).map((item, index) =>
+  const posts = pickList(feedPayload, 'posts').map((item) => normalizePost(item, usersById));
+  const stories = pickList(storiesPayload, 'stories').map((item, index) =>
     normalizeStory(item, usersById, index),
   );
-  const reels = pickList(reelsPayload, ['reels']).map(normalizeReel);
+  const reels = pickList(reelsPayload, 'reels').map(normalizeReel);
 
-  const jobsSource = isRecord(jobsPayload) ? jobsPayload : {};
-  const jobs = pickList(jobsSource, ['jobs']).map(normalizeJob);
+  const jobs = pickList(jobsPayload, 'jobs').map(normalizeJob);
 
-  const communitiesSource = isRecord(communitiesPayload) ? communitiesPayload : {};
-  const communities = pickList(communitiesSource, ['communities']).map(normalizeCommunity);
+  const communities = pickList(communitiesPayload, 'communities').map(normalizeCommunity);
 
   const trends = pickList(trendingPayload).map(normalizeTrend);
 
   const notificationsObject = pickObject(notificationsPayload);
-  const notifications = pickList(notificationsObject, ['notifications', 'inbox']).map(
-    normalizeNotification,
-  );
+  const notifications = pickList(notificationsObject, 'notifications').map(normalizeNotification);
 
   const searchObject = pickObject(searchPayload);
-  const search = pickList(searchObject, ['results', 'items']).map(normalizeSearchItem);
+  const search = pickList(searchObject, 'results').map(normalizeSearchItem);
 
   return {
     userSuggestions: users.slice(0, 6),
@@ -1172,4 +1157,247 @@ export function buildExploreClusters(data: {
   communities: CommunityView[];
 }) {
   return deriveExplore(data.search, data.trends, data.jobs, data.communities);
+}
+
+export async function fetchSavedCollections(token: string) {
+  const payload = await request('/saved-collections', {}, token);
+  return pickList(payload, 'collections');
+}
+
+export async function createSavedCollection(
+  input: { name: string; privacy?: string; itemIds?: string[] },
+  token: string,
+) {
+  return request(
+    '/saved-collections',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
+export async function fetchDraftsScheduling(token: string) {
+  const payload = await request('/drafts-scheduling', {}, token);
+  return pickObject(payload);
+}
+
+export async function fetchGroups() {
+  const payload = await request('/groups');
+  return pickList(payload, 'groups');
+}
+
+export async function fetchGroupChats(token: string) {
+  const payload = await request('/group-chat', {}, token);
+  return pickList(payload, 'groups');
+}
+
+export async function fetchCreatorDashboard(token: string) {
+  const payload = await request('/creator-dashboard', {}, token);
+  return pickObject(payload);
+}
+
+export async function fetchWalletPayments(token: string) {
+  const payload = await request('/wallet-payments', {}, token);
+  return pickObject(payload);
+}
+
+export async function fetchPremiumMembership() {
+  const payload = await request('/premium-membership');
+  return pickList(payload);
+}
+
+export async function fetchSubscriptions(token: string) {
+  const payload = await request('/subscriptions', {}, token);
+  return pickList(payload, 'subscriptions');
+}
+
+export async function changeSubscriptionPlan(planId: string, token: string) {
+  return request(
+    '/subscriptions/change-plan',
+    {
+      method: 'POST',
+      body: JSON.stringify({ planId }),
+    },
+    token,
+  );
+}
+
+export async function cancelSubscription(subscriptionId: string, token: string) {
+  return request(
+    '/subscriptions/cancel',
+    {
+      method: 'POST',
+      body: JSON.stringify({ subscriptionId }),
+    },
+    token,
+  );
+}
+
+export async function renewSubscription(subscriptionId: string, token: string) {
+  return request(
+    '/subscriptions/renew',
+    {
+      method: 'POST',
+      body: JSON.stringify({ subscriptionId }),
+    },
+    token,
+  );
+}
+
+export async function fetchSupportHelp(token?: string) {
+  const payload = await request('/support-help', {}, token);
+  return pickObject(payload);
+}
+
+export async function createSupportTicket(
+  input: { subject: string; category: string; message: string; priority?: string },
+  token: string,
+) {
+  return request(
+    '/support/tickets',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    token,
+  );
+}
+
+export async function sendSupportHelpMessage(message: string, token: string) {
+  return request(
+    '/support-help/chat',
+    {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    },
+    token,
+  );
+}
+
+export async function fetchVerificationOverview(token: string) {
+  const [requestPayload, statusPayload, documentsPayload] = await Promise.all([
+    request('/verification-request', {}, token),
+    request('/verification-request/status', {}, token),
+    request('/verification-request/documents', {}, token),
+  ]);
+
+  return {
+    request: pickObject(requestPayload),
+    status: pickObject(statusPayload),
+    documents: pickList(documentsPayload, 'documents'),
+  };
+}
+
+export async function toggleVerificationDocument(documentName: string, token: string) {
+  return request(
+    '/verification-request/documents',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ documentName }),
+    },
+    token,
+  );
+}
+
+export async function submitVerificationDocuments(documents: string[], token: string) {
+  return request(
+    '/verification-request/submit',
+    {
+      method: 'POST',
+      body: JSON.stringify({ documents }),
+    },
+    token,
+  );
+}
+
+export async function fetchActivitySessions(token: string) {
+  const [sessionsPayload, historyPayload] = await Promise.all([
+    request('/activity-sessions', {}, token),
+    request('/activity-sessions/history', {}, token),
+  ]);
+
+  return {
+    sessions: pickList(sessionsPayload, 'sessions'),
+    history: pickList(historyPayload),
+  };
+}
+
+export async function logoutOtherDevices(token: string) {
+  return request(
+    '/activity-sessions/logout-others',
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function revokeActivitySession(id: string, token: string) {
+  return request(
+    `/activity-sessions/${id}`,
+    {
+      method: 'DELETE',
+    },
+    token,
+  );
+}
+
+export async function fetchAccountSwitching(token: string) {
+  const [accountsPayload, activePayload] = await Promise.all([
+    request('/account-switching', {}, token),
+    request('/account-switching/active', {}, token),
+  ]);
+
+  return {
+    accounts: pickList(accountsPayload, 'accounts'),
+    active: pickObject(activePayload),
+  };
+}
+
+export async function setActiveAccount(accountId: string, token: string) {
+  return request(
+    '/account-switching/active',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ accountId }),
+    },
+    token,
+  );
+}
+
+export async function fetchBlockedUsers(token: string) {
+  const payload = await request('/block', {}, token);
+  return pickList(payload, 'users');
+}
+
+export async function unblockUser(targetId: string, token: string) {
+  return request(
+    `/block/${targetId}`,
+    {
+      method: 'DELETE',
+    },
+    token,
+  );
+}
+
+export async function fetchInviteReferral(token: string) {
+  const payload = await request('/invite-referral', {}, token);
+  return pickObject(payload);
+}
+
+export async function fetchArchiveOverview(token: string) {
+  const [postsPayload, storiesPayload, reelsPayload] = await Promise.all([
+    request('/archive/posts', {}, token),
+    request('/archive/stories', {}, token),
+    request('/archive/reels', {}, token),
+  ]);
+
+  return {
+    posts: pickList(postsPayload),
+    stories: pickList(storiesPayload),
+    reels: pickList(reelsPayload),
+  };
 }

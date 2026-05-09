@@ -10,6 +10,7 @@ import {
   Clock3,
   CloudUpload,
   FileText,
+  Folder,
   Home,
   LayoutGrid,
   LogOut,
@@ -18,9 +19,11 @@ import {
   PlaySquare,
   Search,
   Settings,
+  ShieldCheck,
   UserCircle2,
   Users,
   Video,
+  Wallet,
 } from 'lucide-react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { AppOutletContext } from '../types';
@@ -39,11 +42,11 @@ const sidebarSections = [
     title: 'Create & Manage',
     subtitle: 'Publishing tools and saved workspaces.',
     items: [
-      { to: '/explore', label: 'Drafts', icon: FileText },
-      { to: '/calls', label: 'Scheduling', icon: Clock3 },
-      { to: '/messages', label: 'Upload Manager', icon: CloudUpload },
-      { to: '/profile', label: 'Saved Posts', icon: Bookmark },
-      { to: '/settings', label: 'Archived Posts', icon: Archive },
+      { to: '/drafts', label: 'Drafts', icon: FileText },
+      { to: '/scheduling', label: 'Scheduling', icon: Clock3 },
+      { to: '/upload-manager', label: 'Upload Manager', icon: CloudUpload },
+      { to: '/bookmarks', label: 'Saved Posts', icon: Bookmark },
+      { to: '/archive', label: 'Archive Center', icon: Archive },
     ],
   },
   {
@@ -51,19 +54,30 @@ const sidebarSections = [
     subtitle: 'Explore communities, pages, and live surfaces.',
     items: [
       { to: '/communities', label: 'Communities', icon: Users },
-      { to: '/connections', label: 'Groups', icon: UserCircle2 },
+      { to: '/groups', label: 'Groups', icon: UserCircle2 },
       { to: '/pages', label: 'Pages', icon: LayoutGrid },
       { to: '/marketplace', label: 'Marketplace', icon: Package },
       { to: '/events', label: 'Events', icon: CalendarDays },
       { to: '/live-streams', label: 'Live Stream', icon: Video },
     ],
   },
+  {
+    title: 'Growth & Account',
+    subtitle: 'Creator, monetization, and trust workflows from the app.',
+    items: [
+      { to: '/creator-tools', label: 'Creator Tools', icon: PlaySquare },
+      { to: '/wallet', label: 'Wallet', icon: Wallet },
+      { to: '/subscriptions', label: 'Subscriptions', icon: Folder },
+      { to: '/verification', label: 'Verification', icon: ShieldCheck },
+      { to: '/invite-referral', label: 'Invite Referral', icon: Bell },
+    ],
+  },
 ];
 
 const sidebarFooterItems = [
-  { to: '/connections', label: 'Buddy', icon: Users, tone: 'default' as const },
+  { to: '/group-chat', label: 'Group Chat', icon: Users, tone: 'default' as const },
   { to: '/settings', label: 'Settings', icon: Settings, tone: 'default' as const },
-  { to: '/settings', label: 'Help & Support', icon: CircleHelp, tone: 'default' as const },
+  { to: '/support', label: 'Help & Support', icon: CircleHelp, tone: 'default' as const },
 ];
 
 interface AppLayoutProps {
