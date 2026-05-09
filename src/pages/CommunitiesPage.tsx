@@ -4,6 +4,7 @@ import { useAppOutlet } from '../hooks/useAppOutlet';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { InlineNotice } from '../components/ui/InlineNotice';
 import { Modal } from '../components/ui/Modal';
 import { canCreateCommunity } from '../lib/profileCapabilities';
 import { createCommunity as createCommunityApi } from '../lib/api';
@@ -17,12 +18,16 @@ export function CommunitiesPage() {
   const [category, setCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
   async function handleCreateCommunity() {
     if (!app.session?.accessToken || !name.trim() || !description.trim()) {
       return;
     }
     setSubmitting(true);
+    setFeedback(null);
     try {
       await createCommunityApi(
         {
@@ -37,6 +42,13 @@ export function CommunitiesPage() {
       setDescription('');
       setCategory('');
       await app.refresh({ silent: true });
+      setFeedback({ tone: 'success', message: 'Community created and synced from the backend.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message:
+          error instanceof Error ? error.message : 'Unable to create this community right now.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -47,8 +59,15 @@ export function CommunitiesPage() {
       return;
     }
     setJoiningId(communityId);
+    setFeedback(null);
     try {
       await app.joinCommunity(communityId);
+      setFeedback({ tone: 'success', message: 'You joined the community.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Unable to join this community right now.',
+      });
     } finally {
       setJoiningId(null);
     }
@@ -68,52 +87,69 @@ export function CommunitiesPage() {
 
       <div>
         <h1 className="text-3xl font-semibold text-slate-950 dark:text-white">Groups and communities</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Browse community spaces and membership-driven activity.</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Browse community spaces and membership-driven activity.
+        </p>
       </div>
 
+      {feedback ? <InlineNotice tone={feedback.tone} message={feedback.message} /> : null}
+
       <section className="grid gap-4 md:grid-cols-2">
-        {app.data.communities.map((community) => (
-          <Card key={community.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-950 dark:text-white">{community.name}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {community.category} • {community.location}
-                </p>
-              </div>
-              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-                {community.privacy}
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{community.description}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {community.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">{community.memberCount} members</p>
-              <Button
-                variant={community.joined ? 'secondary' : 'primary'}
-                onClick={() => void handleJoinCommunity(community.id)}
-                disabled={!app.session?.accessToken || Boolean(community.joined) || joiningId === community.id}
-              >
-                {joiningId === community.id
-                  ? 'Joining...'
-                  : community.joined
-                    ? 'Joined'
-                    : app.session?.accessToken
-                      ? 'Join community'
-                      : 'Login to join'}
-              </Button>
-            </div>
+        {app.data.communities.length === 0 ? (
+          <Card className="md:col-span-2">
+            <p className="text-lg font-semibold text-slate-950 dark:text-white">No communities yet.</p>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Communities will appear here when the backend returns them.
+            </p>
           </Card>
-        ))}
+        ) : (
+          app.data.communities.map((community) => (
+            <Card key={community.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-slate-950 dark:text-white">{community.name}</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {community.category} · {community.location}
+                  </p>
+                </div>
+                <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                  {community.privacy}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {community.description}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {community.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {community.memberCount} members
+                </p>
+                <Button
+                  variant={community.joined ? 'secondary' : 'primary'}
+                  onClick={() => void handleJoinCommunity(community.id)}
+                  disabled={!app.session?.accessToken || Boolean(community.joined) || joiningId === community.id}
+                >
+                  {joiningId === community.id
+                    ? 'Joining...'
+                    : community.joined
+                      ? 'Joined'
+                      : app.session?.accessToken
+                        ? 'Join community'
+                        : 'Login to join'}
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
       </section>
 
       <Modal
@@ -139,7 +175,10 @@ export function CommunitiesPage() {
           <Button variant="secondary" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={() => void handleCreateCommunity()} disabled={submitting || !name.trim() || !description.trim()}>
+          <Button
+            onClick={() => void handleCreateCommunity()}
+            disabled={submitting || !name.trim() || !description.trim()}
+          >
             {submitting ? 'Creating...' : 'Create community'}
           </Button>
         </div>

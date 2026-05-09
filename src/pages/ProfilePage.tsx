@@ -15,11 +15,12 @@ import {
   Vote,
   Wallet,
 } from 'lucide-react';
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useAppOutlet } from '../hooks/useAppOutlet';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
+import { InlineNotice } from '../components/ui/InlineNotice';
 import { Modal } from '../components/ui/Modal';
 import { PostCard } from '../components/social/PostCard';
 
@@ -39,7 +40,9 @@ export function ProfilePage() {
   const [about, setAbout] = useState(app.data.profile.about);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+    null,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
@@ -54,6 +57,22 @@ export function ProfilePage() {
   const postMetric = profileMetrics.find((metric) => metric.label.toLowerCase() === 'posts');
   const followerMetric = profileMetrics.find((metric) => metric.label.toLowerCase() === 'followers');
   const followingMetric = profileMetrics.find((metric) => metric.label.toLowerCase() === 'following');
+
+  useEffect(() => {
+    setAvatarPreview(app.data.profile.user.avatar);
+    setCoverPreview(app.data.profile.coverImage);
+    setName(app.data.profile.user.name);
+    setLocation(app.data.profile.location);
+    setWebsite(app.data.profile.website);
+    setAbout(app.data.profile.about);
+  }, [
+    app.data.profile.about,
+    app.data.profile.coverImage,
+    app.data.profile.location,
+    app.data.profile.user.avatar,
+    app.data.profile.user.name,
+    app.data.profile.website,
+  ]);
 
   const utilityItems = [
     { label: 'Wallet', icon: Wallet, bgClassName: 'bg-[#E3F2FD]', iconClassName: 'text-[#1E88E5]' },
@@ -93,6 +112,29 @@ export function ProfilePage() {
 
   function stopCoverDrag() {
     isDraggingCoverRef.current = false;
+  }
+
+  async function handleShareProfile() {
+    const shareText = app.data.profile.user.username
+      ? `Take a look at @${app.data.profile.user.username} on OptiZenqor Socity.`
+      : 'Take a look at this OptiZenqor Socity profile.';
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: app.data.profile.user.name || 'OptiZenqor profile',
+          text: shareText,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+      }
+      setFeedback({ tone: 'success', message: 'Profile share text is ready.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Unable to share this profile right now.',
+      });
+    }
   }
 
   function renderPostsFeed() {
@@ -197,6 +239,8 @@ export function ProfilePage() {
         </div>
 
         <div className="px-4 pb-6 pt-4 sm:px-6">
+          {feedback ? <InlineNotice tone={feedback.tone} message={feedback.message} className="mb-4" /> : null}
+
           <input
             ref={coverInputRef}
             type="file"
@@ -248,7 +292,7 @@ export function ProfilePage() {
               <PenSquare className="h-4 w-4" />
               Edit profile
             </Button>
-            <Button variant="secondary" className="min-h-12 px-4">
+            <Button variant="secondary" className="min-h-12 px-4" onClick={() => void handleShareProfile()}>
               <Share2 className="h-4 w-4" />
             </Button>
           </div>
@@ -354,7 +398,7 @@ export function ProfilePage() {
                 avatarFile,
                 coverFile,
               });
-              setSaveMessage(result.message);
+              setFeedback({ tone: result.ok ? 'success' : 'error', message: result.message });
               setIsSaving(false);
               if (result.ok) {
                 setAvatarFile(null);
@@ -368,7 +412,6 @@ export function ProfilePage() {
             {isSaving ? 'Saving...' : 'Save changes'}
           </Button>
         </div>
-        {saveMessage ? <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{saveMessage}</p> : null}
       </Modal>
     </div>
   );

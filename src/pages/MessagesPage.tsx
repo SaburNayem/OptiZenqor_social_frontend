@@ -6,10 +6,14 @@ import { Button } from '../components/ui/Button';
 import { ChatList } from '../components/social/ChatList';
 import { MessageBubble } from '../components/social/MessageBubble';
 import { Avatar } from '../components/ui/Avatar';
+import { InlineNotice } from '../components/ui/InlineNotice';
 
 export function MessagesPage() {
   const { app } = useAppOutlet();
   const [draft, setDraft] = useState('');
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
   const selectedChat = useMemo(
     () => app.data.chats.find((chat) => chat.id === app.selectedChatId) ?? app.data.chats[0],
@@ -24,6 +28,8 @@ export function MessagesPage() {
           A cleaner web messenger with a dedicated thread list and focused conversation panel.
         </p>
       </div>
+
+      {feedback ? <InlineNotice tone={feedback.tone} message={feedback.message} /> : null}
 
       <section className="grid min-h-[720px] gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="h-fit xl:h-full">
@@ -75,7 +81,7 @@ export function MessagesPage() {
                       }`}
                     />
                     <span>{selectedChat.online ? 'Active now' : `Last seen ${selectedChat.lastActive}`}</span>
-                    <span>•</span>
+                    <span>·</span>
                     <span>{selectedChat.roleLabel}</span>
                   </div>
                 </div>
@@ -117,8 +123,17 @@ export function MessagesPage() {
                 />
                 <Button
                   onClick={async () => {
-                    await app.sendMessage(selectedChat.id, draft);
-                    setDraft('');
+                    try {
+                      await app.sendMessage(selectedChat.id, draft);
+                      setDraft('');
+                      setFeedback({ tone: 'success', message: 'Message sent.' });
+                    } catch (error) {
+                      setFeedback({
+                        tone: 'error',
+                        message:
+                          error instanceof Error ? error.message : 'Unable to send this message right now.',
+                      });
+                    }
                   }}
                   disabled={!draft.trim()}
                 >

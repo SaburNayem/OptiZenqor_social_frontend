@@ -4,6 +4,7 @@ import { useAppOutlet } from '../hooks/useAppOutlet';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { InlineNotice } from '../components/ui/InlineNotice';
 import { Modal } from '../components/ui/Modal';
 import { createPage as createPageApi } from '../lib/api';
 import { canCreatePage } from '../lib/profileCapabilities';
@@ -17,12 +18,16 @@ export function PagesDirectoryPage() {
   const [category, setCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [followingId, setFollowingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
   async function handleCreatePage() {
     if (!app.session?.accessToken || !viewer?.id || !name.trim() || !about.trim() || !category.trim()) {
       return;
     }
     setSubmitting(true);
+    setFeedback(null);
     try {
       await createPageApi(
         {
@@ -38,6 +43,12 @@ export function PagesDirectoryPage() {
       setAbout('');
       setCategory('');
       await app.refresh({ silent: true });
+      setFeedback({ tone: 'success', message: 'Page created and refreshed from the backend.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Unable to create this page right now.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -48,8 +59,15 @@ export function PagesDirectoryPage() {
       return;
     }
     setFollowingId(pageId);
+    setFeedback(null);
     try {
       await app.togglePageFollow(pageId);
+      setFeedback({ tone: 'success', message: 'Page follow status updated.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Unable to update this page right now.',
+      });
     } finally {
       setFollowingId(null);
     }
@@ -67,34 +85,47 @@ export function PagesDirectoryPage() {
 
       <div>
         <h1 className="text-3xl font-semibold text-slate-950 dark:text-white">Public pages directory</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Brand, creator, and organization pages from the live backend.</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Brand, creator, and organization pages from the live backend.
+        </p>
       </div>
 
+      {feedback ? <InlineNotice tone={feedback.tone} message={feedback.message} /> : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {app.data.pages.map((page) => (
-          <Card key={page.id}>
-            <p className="text-lg font-semibold text-slate-950 dark:text-white">{page.name}</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{page.category}</p>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{page.description}</p>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span className="text-sm text-slate-500 dark:text-slate-400">{page.followers} followers</span>
-              <Button
-                size="sm"
-                variant={page.followed ? 'secondary' : 'primary'}
-                disabled={!app.session?.accessToken || followingId === page.id}
-                onClick={() => void handleToggleFollow(page.id)}
-              >
-                {followingId === page.id
-                  ? 'Updating...'
-                  : page.followed
-                    ? 'Following'
-                    : app.session?.accessToken
-                      ? page.actionLabel
-                      : 'Login to follow'}
-              </Button>
-            </div>
+        {app.data.pages.length === 0 ? (
+          <Card className="md:col-span-2 xl:col-span-3">
+            <p className="text-lg font-semibold text-slate-950 dark:text-white">No pages yet.</p>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Pages from the backend directory will appear here.
+            </p>
           </Card>
-        ))}
+        ) : (
+          app.data.pages.map((page) => (
+            <Card key={page.id}>
+              <p className="text-lg font-semibold text-slate-950 dark:text-white">{page.name}</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{page.category}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{page.description}</p>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-500 dark:text-slate-400">{page.followers} followers</span>
+                <Button
+                  size="sm"
+                  variant={page.followed ? 'secondary' : 'primary'}
+                  disabled={!app.session?.accessToken || followingId === page.id}
+                  onClick={() => void handleToggleFollow(page.id)}
+                >
+                  {followingId === page.id
+                    ? 'Updating...'
+                    : page.followed
+                      ? 'Following'
+                      : app.session?.accessToken
+                        ? page.actionLabel
+                        : 'Login to follow'}
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
       </section>
 
       <Modal
@@ -120,7 +151,10 @@ export function PagesDirectoryPage() {
           <Button variant="secondary" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={() => void handleCreatePage()} disabled={submitting || !name.trim() || !about.trim() || !category.trim()}>
+          <Button
+            onClick={() => void handleCreatePage()}
+            disabled={submitting || !name.trim() || !about.trim() || !category.trim()}
+          >
             {submitting ? 'Creating...' : 'Create page'}
           </Button>
         </div>

@@ -4,6 +4,7 @@ import { useAppOutlet } from '../hooks/useAppOutlet';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
+import { InlineNotice } from '../components/ui/InlineNotice';
 import { Modal } from '../components/ui/Modal';
 import { createMarketplaceProduct } from '../lib/api';
 import { canCreateMarketplace } from '../lib/profileCapabilities';
@@ -20,6 +21,9 @@ export function MarketplacePage() {
   const [location, setLocation] = useState('');
   const [condition, setCondition] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
   async function handleCreateMarketplaceItem() {
     if (
@@ -36,6 +40,7 @@ export function MarketplacePage() {
       return;
     }
     setSubmitting(true);
+    setFeedback(null);
     try {
       await createMarketplaceProduct(
         {
@@ -60,6 +65,12 @@ export function MarketplacePage() {
       setLocation('');
       setCondition('');
       await app.refresh({ silent: true });
+      setFeedback({ tone: 'success', message: 'Listing created and synced from the backend.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Unable to create this listing right now.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -77,8 +88,12 @@ export function MarketplacePage() {
 
       <div>
         <h1 className="text-3xl font-semibold text-slate-950 dark:text-white">Buy, sell, and manage listings</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Live marketplace inventory from the same backend used by the app.</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Live marketplace inventory from the same backend used by the app.
+        </p>
       </div>
+
+      {feedback ? <InlineNotice tone={feedback.tone} message={feedback.message} /> : null}
 
       {app.data.marketplace.length === 0 ? (
         <Card>

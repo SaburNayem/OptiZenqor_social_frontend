@@ -4,6 +4,7 @@ import { useAppOutlet } from '../hooks/useAppOutlet';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
+import { InlineNotice } from '../components/ui/InlineNotice';
 import { Modal } from '../components/ui/Modal';
 import { createJob as createJobApi } from '../lib/api';
 import { canCreateJob } from '../lib/profileCapabilities';
@@ -19,12 +20,16 @@ export function JobsPage() {
   const [type, setType] = useState('fullTime');
   const [experienceLevel, setExperienceLevel] = useState('mid');
   const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
   async function handleCreateJob() {
     if (!app.session?.accessToken || !title.trim() || !company.trim() || !location.trim() || !salary.trim()) {
       return;
     }
     setSubmitting(true);
+    setFeedback(null);
     try {
       await createJobApi(
         {
@@ -43,6 +48,12 @@ export function JobsPage() {
       setLocation('');
       setSalary('');
       await app.refresh({ silent: true });
+      setFeedback({ tone: 'success', message: 'Job posted and refreshed from the backend.' });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Unable to create this job right now.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -60,41 +71,54 @@ export function JobsPage() {
 
       <div>
         <h1 className="text-3xl font-semibold text-slate-950 dark:text-white">Career and hiring hub</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Jobs and networking roles connected to the same backend as the mobile app.</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Jobs and networking roles connected to the same backend as the mobile app.
+        </p>
       </div>
 
+      {feedback ? <InlineNotice tone={feedback.tone} message={feedback.message} /> : null}
+
       <section className="grid gap-4 md:grid-cols-2">
-        {app.data.jobs.map((job) => (
-          <Card key={job.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-950 dark:text-white">{job.title}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {job.company} • {job.location}
-                </p>
-              </div>
-              {job.featured ? (
-                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                  Featured
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {job.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="font-semibold text-slate-950 dark:text-white">{job.salary}</span>
-              <span className="text-slate-500 dark:text-slate-400">{job.postedTime}</span>
-            </div>
+        {app.data.jobs.length === 0 ? (
+          <Card className="md:col-span-2">
+            <p className="text-lg font-semibold text-slate-950 dark:text-white">No jobs yet.</p>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Open roles will appear here when the backend returns them.
+            </p>
           </Card>
-        ))}
+        ) : (
+          app.data.jobs.map((job) => (
+            <Card key={job.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-slate-950 dark:text-white">{job.title}</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {job.company} · {job.location}
+                  </p>
+                </div>
+                {job.featured ? (
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                    Featured
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {job.skills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-950 dark:text-white">{job.salary}</span>
+                <span className="text-slate-500 dark:text-slate-400">{job.postedTime}</span>
+              </div>
+            </Card>
+          ))
+        )}
       </section>
 
       <Modal
@@ -143,7 +167,10 @@ export function JobsPage() {
           <Button variant="secondary" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={() => void handleCreateJob()} disabled={submitting || !title.trim() || !company.trim() || !location.trim() || !salary.trim()}>
+          <Button
+            onClick={() => void handleCreateJob()}
+            disabled={submitting || !title.trim() || !company.trim() || !location.trim() || !salary.trim()}
+          >
             {submitting ? 'Creating...' : 'Create job'}
           </Button>
         </div>

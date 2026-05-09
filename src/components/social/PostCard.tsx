@@ -46,7 +46,13 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
             {post.headline}
           </p>
         ) : null}
-        <p className={`${post.headline && post.headline.trim() && post.headline.trim().toLowerCase() !== 'post' ? 'mt-2' : ''} text-sm leading-7 text-slate-600 dark:text-slate-300`}>
+        <p
+          className={`${
+            post.headline && post.headline.trim() && post.headline.trim().toLowerCase() !== 'post'
+              ? 'mt-2'
+              : ''
+          } text-sm leading-7 text-slate-600 dark:text-slate-300`}
+        >
           {post.content}
         </p>
         {post.tags.length > 0 ? (
@@ -66,7 +72,11 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
       {post.media[0] ? (
         post.media[0].type === 'image' ? (
           <div className="overflow-hidden rounded-[24px]">
-            <img src={post.media[0].url} alt={post.media[0].alt} className="h-[340px] w-full object-cover" />
+            <img
+              src={post.media[0].url}
+              alt={post.media[0].alt}
+              className="h-[340px] w-full object-cover"
+            />
           </div>
         ) : (
           <div className="overflow-hidden rounded-[24px] bg-slate-950">
@@ -92,7 +102,11 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Button variant={post.liked ? 'primary' : 'secondary'} size="sm" onClick={() => void onLike(post.id)}>
+        <Button
+          variant={post.liked ? 'primary' : 'secondary'}
+          size="sm"
+          onClick={() => void onLike(post.id)}
+        >
           <Heart className="h-4 w-4" />
           Like
         </Button>
@@ -134,11 +148,7 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
           </div>
 
           <div className="flex gap-3">
-            <Avatar
-              src={viewer?.avatar ?? ''}
-              alt={viewer?.name ?? 'Member'}
-              size="sm"
-            />
+            <Avatar src={viewer?.avatar ?? ''} alt={viewer?.name ?? 'Member'} size="sm" />
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[24px] border border-white/70 bg-white px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <input
                 value={comment}
