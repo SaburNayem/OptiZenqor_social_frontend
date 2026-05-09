@@ -70,6 +70,7 @@ export interface FeedPostView {
   views: number;
   createdAt: string;
   tags: string[];
+  saved?: boolean;
 }
 
 export interface ReelView {
@@ -374,12 +375,12 @@ export interface SocialAppState {
     files?: File[];
   }) => Promise<AuthResult>;
   toggleLike: (postId: string) => Promise<void>;
-  toggleSave: (postId: string) => void;
+  toggleSave: (postId: string) => Promise<void>;
   addComment: (postId: string, message: string) => Promise<void>;
-  markNotificationRead: (notificationId: string) => void;
+  markNotificationRead: (notificationId: string) => Promise<void>;
   setSelectedChatId: (chatId: string) => void;
   sendMessage: (chatId: string, message: string) => Promise<void>;
-  toggleFollowSuggestion: (suggestionId: string) => void;
+  toggleFollowSuggestion: (suggestionId: string) => Promise<void>;
   joinCommunity: (communityId: string) => Promise<void>;
   toggleEventRsvp: (eventId: string) => Promise<void>;
   toggleEventSave: (eventId: string) => Promise<void>;

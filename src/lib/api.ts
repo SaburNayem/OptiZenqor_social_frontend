@@ -247,6 +247,7 @@ function normalizePost(raw: unknown, usersById: Map<string, ViewerUser>): FeedPo
     views: asNumber(record.views),
     createdAt: formatRelative(asText(record.createdAt)),
     tags: toArray(record.tags).filter((item): item is string => typeof item === 'string'),
+    saved: Boolean(record.saved),
   };
 }
 
@@ -952,6 +953,35 @@ export async function toggleEventSave(eventId: string, token: string) {
     `/events/${eventId}/save`,
     {
       method: 'PATCH',
+      body: JSON.stringify({}),
+    },
+    token,
+  );
+}
+
+export async function fetchBookmarkIds(token: string) {
+  const payload = await request('/bookmarks', {}, token);
+  return pickList(payload, ['bookmarks', 'items', 'results'])
+    .filter((item) => isRecord(item) && asText(item.type, 'post') === 'post')
+    .map((item) => asText((item as JsonRecord).id))
+    .filter(Boolean);
+}
+
+export async function togglePostSave(postId: string, saved: boolean, token: string) {
+  if (saved) {
+    return request(
+      `/bookmarks/${postId}`,
+      {
+        method: 'DELETE',
+      },
+      token,
+    );
+  }
+
+  return request(
+    `/bookmarks/posts/${postId}`,
+    {
+      method: 'POST',
       body: JSON.stringify({}),
     },
     token,

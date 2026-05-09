@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildExploreClusters,
   createPost as createPostApi,
   createPostWithMedia as createPostWithMediaApi,
   createPostComment as createPostCommentApi,
   fetchCalls,
+  fetchBookmarkIds,
   fetchDashboard,
   fetchConnections,
   fetchEvents,
@@ -26,6 +27,7 @@ import {
   toggleFollowUser as toggleFollowUserApi,
   togglePageFollow as togglePageFollowApi,
   togglePostLike as togglePostLikeApi,
+  togglePostSave as togglePostSaveApi,
   uploadAsset as uploadAssetApi,
   updateProfile as updateProfileApi,
 } from '../lib/api';
@@ -116,7 +118,7 @@ function makeFeedPost(post: DashboardData['posts'][number]): SocialPost {
     ...post,
     media,
     liked: false,
-    saved: false,
+    saved: Boolean(post.saved),
     visibility: 'public',
     commentsList: [],
   };
@@ -135,6 +137,7 @@ function mergeDashboardIntoData(
   dashboard: DashboardData,
   viewer: ViewerUser,
   extras?: {
+    savedPostIds?: string[];
     chats?: SocialAppData['chats'];
     connections?: SocialAppData['connections'];
     profile?: SocialAppData['profile'];
@@ -156,7 +159,17 @@ function mergeDashboardIntoData(
   return {
     ...base,
     stories: dashboard.stories.length > 0 ? dashboard.stories : base.stories,
-    posts: dashboard.posts.length > 0 ? dashboard.posts.map(makeFeedPost) : base.posts,
+    posts:
+      dashboard.posts.length > 0
+        ? dashboard.posts.map((post) =>
+            makeFeedPost({
+              ...post,
+              saved: extras?.savedPostIds
+                ? extras.savedPostIds.includes(post.id)
+                : Boolean(post.saved),
+            }),
+          )
+        : base.posts,
     reels: dashboard.reels.length > 0 ? dashboard.reels : base.reels,
     suggestions:
       dashboard.userSuggestions.length > 0
@@ -211,6 +224,11 @@ export function useSocialApp(): SocialAppState {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChatId, setSelectedChatId] = useState('');
+  const dataRef = useRef(data);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const activeSession = readSession();
@@ -230,60 +248,141 @@ export function useSocialApp(): SocialAppState {
         return;
       }
 
-      let viewer = activeSession.user;
-      let chats = baseData.chats;
-      let connections = baseData.connections;
-      let profile = baseData.profile;
-      let settings = baseData.settings;
-      let marketplace = baseData.marketplace;
-      let events = baseData.events;
-      let pages = baseData.pages;
-      let calls = baseData.calls;
-      let liveStreams = baseData.liveStreams;
-
-      viewer = await fetchMe(activeSession.accessToken);
+      const viewer = await fetchMe(activeSession.accessToken);
       const nextSession = { ...activeSession, user: viewer };
       setSession(nextSession);
       writeSession(nextSession);
-      const [profilePayload, chatPayload, connectionPayload, settingsPayload, marketplacePayload, eventsPayload, pagesPayload, callsPayload, liveStreamsPayload] =
-        await Promise.all([
-          fetchProfile(activeSession.accessToken),
-          fetchChatThreads(activeSession.accessToken, viewer.id),
-          fetchConnections(activeSession.accessToken),
-          fetchSettings(activeSession.accessToken),
-          fetchMarketplace(activeSession.accessToken),
-          fetchEvents(),
-          fetchPages(),
-          fetchCalls(activeSession.accessToken),
-          fetchLiveStreams(),
-        ]);
-      profile = profilePayload;
-      chats = chatPayload;
-      connections = connectionPayload;
-      settings = settingsPayload;
-      marketplace = marketplacePayload;
-      events = eventsPayload;
-      pages = pagesPayload;
-      calls = callsPayload;
-      liveStreams = liveStreamsPayload;
 
-      const dashboard = await fetchDashboard(activeSession.accessToken, '');
+      const currentDataSnapshot = dataRef.current;
+      const requests = await Promise.allSettled([
+        fetchProfile(activeSession.accessToken),
+        fetchChatThreads(activeSession.accessToken, viewer.id),
+        fetchConnections(activeSession.accessToken),
+        fetchSettings(activeSession.accessToken),
+        fetchBookmarkIds(activeSession.accessToken),
+        fetchMarketplace(activeSession.accessToken),
+        fetchEvents(),
+        fetchPages(),
+        fetchCalls(activeSession.accessToken),
+        fetchLiveStreams(),
+        fetchDashboard(activeSession.accessToken, ''),
+      ]);
+
+      const [
+        profileResult,
+        chatsResult,
+        connectionsResult,
+        settingsResult,
+        bookmarkIdsResult,
+        marketplaceResult,
+        eventsResult,
+        pagesResult,
+        callsResult,
+        liveStreamsResult,
+        dashboardResult,
+      ] = requests;
+
+      const savedPostIds =
+        bookmarkIdsResult.status === 'fulfilled'
+          ? bookmarkIdsResult.value
+          : currentDataSnapshot.posts.filter((post) => post.saved).map((post) => post.id);
+
+      const dashboard =
+        dashboardResult.status === 'fulfilled'
+          ? dashboardResult.value
+          : {
+              userSuggestions: [],
+              stories: currentDataSnapshot.stories,
+              posts: currentDataSnapshot.posts,
+              reels: currentDataSnapshot.reels,
+              jobs: currentDataSnapshot.jobs,
+              communities: currentDataSnapshot.communities,
+              trends: currentDataSnapshot.trends,
+              notifications: currentDataSnapshot.notifications,
+              search: currentDataSnapshot.explore.map((item) => ({
+                id: item.id,
+                type: 'explore',
+                title: item.title,
+                subtitle: item.description,
+                image: item.image,
+              })),
+              stats: {
+                posts: currentDataSnapshot.posts.length,
+                stories: currentDataSnapshot.stories.length,
+                reels: currentDataSnapshot.reels.length,
+                communities: currentDataSnapshot.communities.length,
+                jobs: currentDataSnapshot.jobs.length,
+                notifications: currentDataSnapshot.notifications.length,
+              },
+            };
+
       setData(
-        mergeDashboardIntoData(baseData, dashboard, viewer, {
-          chats,
-          connections,
-          profile,
-          settings,
-          marketplace,
-          events,
-          pages,
-          calls,
-          liveStreams,
+        mergeDashboardIntoData(currentDataSnapshot, dashboard, viewer, {
+          savedPostIds,
+          chats:
+            chatsResult.status === 'fulfilled'
+              ? chatsResult.value
+              : currentDataSnapshot.chats,
+          connections:
+            connectionsResult.status === 'fulfilled'
+              ? connectionsResult.value
+              : currentDataSnapshot.connections,
+          profile:
+            profileResult.status === 'fulfilled'
+              ? profileResult.value
+              : {
+                  ...currentDataSnapshot.profile,
+                  user: viewer,
+                },
+          settings:
+            settingsResult.status === 'fulfilled'
+              ? settingsResult.value
+              : currentDataSnapshot.settings,
+          marketplace:
+            marketplaceResult.status === 'fulfilled'
+              ? marketplaceResult.value
+              : currentDataSnapshot.marketplace,
+          events:
+            eventsResult.status === 'fulfilled'
+              ? eventsResult.value
+              : currentDataSnapshot.events,
+          pages:
+            pagesResult.status === 'fulfilled'
+              ? pagesResult.value
+              : currentDataSnapshot.pages,
+          calls:
+            callsResult.status === 'fulfilled'
+              ? callsResult.value
+              : currentDataSnapshot.calls,
+          liveStreams:
+            liveStreamsResult.status === 'fulfilled'
+              ? liveStreamsResult.value
+              : currentDataSnapshot.liveStreams,
         }),
       );
-      setLoadError(null);
+
+      const failedSlices: string[] = ([
+        ['profile', profileResult],
+        ['messages', chatsResult],
+        ['connections', connectionsResult],
+        ['settings', settingsResult],
+        ['saved posts', bookmarkIdsResult],
+        ['marketplace', marketplaceResult],
+        ['events', eventsResult],
+        ['pages', pagesResult],
+        ['calls', callsResult],
+        ['live streams', liveStreamsResult],
+        ['dashboard feed', dashboardResult],
+      ] as const)
+        .filter(([, result]) => result.status === 'rejected')
+        .map(([label]) => label);
+
+      setLoadError(
+        failedSlices.length > 0
+          ? `Some live sections could not be refreshed: ${failedSlices.join(', ')}. Showing the latest available backend-backed data for those areas.`
+          : null,
+      );
     } catch (error) {
-      setData(baseData);
       setLoadError(
         error instanceof Error
           ? error.message
@@ -294,6 +393,42 @@ export function useSocialApp(): SocialAppState {
       setIsRefreshing(false);
     }
   }, []);
+
+  const runAuthenticatedAction = useCallback(
+    async (
+      action: () => Promise<void>,
+      options: {
+        missingAuthMessage: string;
+        successMessage?: string;
+        errorMessage?: string;
+        refreshAfter?: boolean;
+      },
+    ) => {
+      if (!session?.accessToken) {
+        setAuthMessage(options.missingAuthMessage);
+        return false;
+      }
+
+      try {
+        await action();
+        if (options.refreshAfter !== false) {
+          await refresh({ silent: true });
+        }
+        if (options.successMessage) {
+          setAuthMessage(options.successMessage);
+        }
+        return true;
+      } catch (error) {
+        setAuthMessage(
+          error instanceof Error
+            ? error.message
+            : (options.errorMessage ?? 'Unable to complete this action right now.'),
+        );
+        return false;
+      }
+    },
+    [refresh, session?.accessToken],
+  );
 
   useEffect(() => {
     void refresh();
@@ -499,245 +634,146 @@ export function useSocialApp(): SocialAppState {
     }
   }
 
-  function updatePost(postId: string, updater: (post: SocialPost) => SocialPost) {
-    setData((current) => ({
-      ...current,
-      posts: current.posts.map((post) => (post.id === postId ? updater(post) : post)),
-    }));
-  }
-
   async function toggleLike(postId: string) {
-    if (!session?.accessToken) {
-      setAuthMessage('Sign in to like posts.');
-      return;
-    }
-
     const previousPost = data.posts.find((item) => item.id === postId);
     if (!previousPost) {
       return;
     }
 
-    updatePost(postId, (post) => ({
-      ...post,
-      liked: !post.liked,
-      likes: post.likes + (post.liked ? -1 : 1),
-    }));
-
-    try {
-      await togglePostLikeApi(postId, !previousPost.liked, session.accessToken);
-      await refresh({ silent: true });
-    } catch (error) {
-      updatePost(postId, () => previousPost);
-      setAuthMessage(error instanceof Error ? error.message : 'Unable to update post like right now.');
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await togglePostLikeApi(postId, !previousPost.liked, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to like posts.',
+        errorMessage: 'Unable to update post like right now.',
+      },
+    );
   }
 
-  function toggleSave(postId: string) {
-    updatePost(postId, (post) => ({
-      ...post,
-      saved: !post.saved,
-    }));
+  async function toggleSave(postId: string) {
+    const previousPost = data.posts.find((item) => item.id === postId);
+    if (!previousPost) {
+      return;
+    }
+
+    await runAuthenticatedAction(
+      async () => {
+        await togglePostSaveApi(postId, previousPost.saved, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to save posts.',
+        errorMessage: 'Unable to update saved post state right now.',
+      },
+    );
   }
 
   async function addComment(postId: string, message: string) {
     if (!message.trim()) {
       return;
     }
-    if (!session?.accessToken) {
-      return;
-    }
-    await createPostCommentApi(postId, message.trim(), session.accessToken);
-    await refresh({ silent: true });
+    await runAuthenticatedAction(
+      async () => {
+        await createPostCommentApi(postId, message.trim(), session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to comment on posts.',
+        errorMessage: 'Unable to post your comment right now.',
+      },
+    );
   }
 
-  function markNotificationRead(notificationId: string) {
-    setData((current) => ({
-      ...current,
-      notifications: current.notifications.map((notification) =>
-        notification.id === notificationId ? { ...notification, unread: false } : notification,
-      ),
-    }));
-
-    if (session?.accessToken) {
-      void markNotificationReadApi(notificationId, session.accessToken).catch(() => undefined);
-    }
+  async function markNotificationRead(notificationId: string) {
+    await runAuthenticatedAction(
+      async () => {
+        await markNotificationReadApi(notificationId, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to manage notifications.',
+        errorMessage: 'Unable to mark this notification as read right now.',
+      },
+    );
   }
 
   async function sendMessage(chatId: string, message: string) {
     if (!message.trim()) {
       return;
     }
-    if (session?.accessToken) {
-      await sendThreadMessageApi(chatId, message.trim(), session.accessToken);
-      await refresh({ silent: true });
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await sendThreadMessageApi(chatId, message.trim(), session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to send messages.',
+        errorMessage: 'Unable to send your message right now.',
+      },
+    );
   }
 
-  function toggleFollowSuggestion(suggestionId: string) {
+  async function toggleFollowSuggestion(suggestionId: string) {
     const suggestion = data.suggestions.find((item) => item.id === suggestionId);
     if (!suggestion) {
       return;
     }
 
     const nextFollowing = !suggestion.following;
-
-    setData((current) => ({
-      ...current,
-      suggestions: current.suggestions.map((item) =>
-        item.id === suggestionId ? { ...item, following: nextFollowing } : item,
-      ),
-    }));
-
-    if (session?.accessToken) {
-      void toggleFollowUserApi(suggestion.user.id, nextFollowing, session.accessToken).catch(
-        () => undefined,
-      );
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await toggleFollowUserApi(suggestion.user.id, nextFollowing, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to follow people.',
+        errorMessage: 'Unable to update follow state right now.',
+      },
+    );
   }
 
   async function joinCommunity(communityId: string) {
-    if (!session?.accessToken) {
-      return;
-    }
-
-    setData((current) => ({
-      ...current,
-      communities: current.communities.map((community) =>
-        community.id === communityId
-          ? {
-              ...community,
-              joined: true,
-              memberCount: community.joined ? community.memberCount : community.memberCount + 1,
-            }
-          : community,
-      ),
-    }));
-
-    try {
-      await joinCommunityApi(communityId, session.accessToken);
-      await refresh({ silent: true });
-    } catch (error) {
-      setData((current) => ({
-        ...current,
-        communities: current.communities.map((community) =>
-          community.id === communityId
-            ? {
-                ...community,
-                joined: false,
-                memberCount: community.joined ? community.memberCount : Math.max(0, community.memberCount - 1),
-              }
-            : community,
-        ),
-      }));
-      setAuthMessage(
-        error instanceof Error ? error.message : 'Unable to join this community right now.',
-      );
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await joinCommunityApi(communityId, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to join communities.',
+        errorMessage: 'Unable to join this community right now.',
+      },
+    );
   }
 
   async function toggleEventRsvp(eventId: string) {
-    if (!session?.accessToken) {
-      return;
-    }
-
-    const previousEvent = data.events.find((item) => item.id === eventId);
-    if (!previousEvent) {
-      return;
-    }
-
-    setData((current) => ({
-      ...current,
-      events: current.events.map((item) =>
-        item.id === eventId
-          ? {
-              ...item,
-              rsvped: !item.rsvped,
-              attendeeCount: item.rsvped ? Math.max(0, item.attendeeCount - 1) : item.attendeeCount + 1,
-            }
-          : item,
-      ),
-    }));
-
-    try {
-      await toggleEventRsvpApi(eventId, session.accessToken);
-      await refresh({ silent: true });
-    } catch (error) {
-      setData((current) => ({
-        ...current,
-        events: current.events.map((item) => (item.id === eventId ? previousEvent : item)),
-      }));
-      setAuthMessage(error instanceof Error ? error.message : 'Unable to update RSVP right now.');
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await toggleEventRsvpApi(eventId, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to RSVP to events.',
+        errorMessage: 'Unable to update RSVP right now.',
+      },
+    );
   }
 
   async function toggleEventSave(eventId: string) {
-    if (!session?.accessToken) {
-      return;
-    }
-
-    const previousEvent = data.events.find((item) => item.id === eventId);
-    if (!previousEvent) {
-      return;
-    }
-
-    setData((current) => ({
-      ...current,
-      events: current.events.map((item) =>
-        item.id === eventId
-          ? {
-              ...item,
-              saved: !item.saved,
-            }
-          : item,
-      ),
-    }));
-
-    try {
-      await toggleEventSaveApi(eventId, session.accessToken);
-      await refresh({ silent: true });
-    } catch (error) {
-      setData((current) => ({
-        ...current,
-        events: current.events.map((item) => (item.id === eventId ? previousEvent : item)),
-      }));
-      setAuthMessage(error instanceof Error ? error.message : 'Unable to update saved event state right now.');
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await toggleEventSaveApi(eventId, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to save events.',
+        errorMessage: 'Unable to update saved event state right now.',
+      },
+    );
   }
 
   async function togglePageFollow(pageId: string) {
-    if (!session?.accessToken) {
-      return;
-    }
-
-    const previousPage = data.pages.find((item) => item.id === pageId);
-    if (!previousPage) {
-      return;
-    }
-
-    setData((current) => ({
-      ...current,
-      pages: current.pages.map((item) =>
-        item.id === pageId
-          ? {
-              ...item,
-              followed: !item.followed,
-              followers: item.followed ? Math.max(0, item.followers - 1) : item.followers + 1,
-              actionLabel: item.followed ? 'Follow' : 'Following',
-            }
-          : item,
-      ),
-    }));
-
-    try {
-      await togglePageFollowApi(pageId, session.accessToken);
-      await refresh({ silent: true });
-    } catch (error) {
-      setData((current) => ({
-        ...current,
-        pages: current.pages.map((item) => (item.id === pageId ? previousPage : item)),
-      }));
-      setAuthMessage(error instanceof Error ? error.message : 'Unable to update page follow state right now.');
-    }
+    await runAuthenticatedAction(
+      async () => {
+        await togglePageFollowApi(pageId, session!.accessToken);
+      },
+      {
+        missingAuthMessage: 'Sign in to follow pages.',
+        errorMessage: 'Unable to update page follow state right now.',
+      },
+    );
   }
 
   async function updateProfile(
