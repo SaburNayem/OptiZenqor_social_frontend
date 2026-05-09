@@ -285,9 +285,7 @@ function normalizeReel(raw: unknown): ReelView {
   return {
     id: asText(record.id),
     caption: asText(record.caption, 'Untitled reel'),
-    thumbnail:
-      asText(record.thumbnail) ||
-      'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=80',
+    thumbnail: asText(record.thumbnail) || asText(record.coverImageUrl) || undefined,
     audioName: asText(record.audioName, 'Original audio'),
     likes: asNumber(record.likes),
     comments: asNumber(record.comments),
@@ -494,10 +492,7 @@ function normalizeProfile(raw: unknown, fallbackUser?: ViewerUser): UserProfile 
 
   return {
     user,
-    coverImage:
-      user.coverImage ||
-      asText((record as JsonRecord).coverImage) ||
-      'https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1600&q=80',
+    coverImage: user.coverImage || asText((record as JsonRecord).coverImage),
     headline: user.headline || asText((record as JsonRecord).headline) || user.bio || 'Profile overview',
     about: user.bio || asText((record as JsonRecord).about) || 'No bio added yet.',
     location: user.location || 'Global',
@@ -596,17 +591,11 @@ function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]
 }
 
 function deriveExplore(search: SearchItemView[], trends: TrendView[], jobs: JobView[], communities: CommunityView[]) {
-  const searchClusters = search.slice(0, 3).map((item, index) => ({
+  const searchClusters = search.slice(0, 3).map((item) => ({
     id: `explore-${item.id}`,
     title: item.title,
     description: item.subtitle || `${capitalize(item.type)} surfaced by live search.`,
-    image:
-      item.image ||
-      [
-        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
-      ][index % 3],
+    image: item.image || undefined,
     stat: capitalize(item.type),
   }));
 
@@ -619,21 +608,18 @@ function deriveExplore(search: SearchItemView[], trends: TrendView[], jobs: JobV
       id: `explore-trend-${trend.id}`,
       title: trend.topic,
       description: trend.detail,
-      image: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1200&q=80',
       stat: trend.volume,
     })),
     ...jobs.slice(0, 1).map((job) => ({
       id: `explore-job-${job.id}`,
       title: job.title,
       description: `${job.company} • ${job.location}`,
-      image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
       stat: job.type,
     })),
     ...communities.slice(0, 1).map((community) => ({
       id: `explore-community-${community.id}`,
       title: community.name,
       description: community.description,
-      image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
       stat: `${community.memberCount} members`,
     })),
   ];
@@ -711,12 +697,112 @@ export async function createPost(input: { caption: string; tags: string[] }, tok
   return payload;
 }
 
+export async function uploadAsset(
+  file: File,
+  token: string,
+  input?: {
+    folder?: string;
+    publicId?: string;
+    resourceType?: 'image' | 'video' | 'raw' | 'auto';
+  },
+) {
+  if (!API_BASE_URL) {
+    throw new Error(
+      'VITE_API_BASE_URL is missing. Configure the public web frontend before making API requests.',
+    );
+  }
+
+  const formData = new FormData();
+  formData.set('file', file);
+  if (input?.folder) {
+    formData.set('folder', input.folder);
+  }
+  if (input?.publicId) {
+    formData.set('publicId', input.publicId);
+  }
+  if (input?.resourceType) {
+    formData.set('resourceType', input.resourceType);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/uploads`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  } catch (error) {
+    const wrappedError = new Error(buildNetworkErrorMessage(error)) as Error & { cause?: unknown };
+    wrappedError.cause = error;
+    throw wrappedError;
+  }
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      (isRecord(body) && typeof body.message === 'string' && body.message) ||
+      `Upload failed with ${response.status}`;
+    throw new Error(message);
+  }
+
+  const record = pickObject(body);
+  const url =
+    asText((record.upload as JsonRecord | undefined)?.secureUrl) ||
+    asText((record.upload as JsonRecord | undefined)?.url) ||
+    asText(record.secureUrl) ||
+    asText(record.url) ||
+    asText(record.remotePath) ||
+    asText(record.fileUrl);
+
+  if (!url) {
+    throw new Error('Upload completed but the backend did not return a usable file URL.');
+  }
+
+  return {
+    url,
+    uploadId: asText((record.upload as JsonRecord | undefined)?.id),
+  };
+}
+
+export async function createPostWithMedia(
+  input: { caption: string; tags: string[]; media: string[] },
+  token: string,
+) {
+  const payload = await request(
+    '/posts',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        caption: input.caption,
+        media: input.media,
+        tags: input.tags,
+      }),
+    },
+    token,
+  );
+  return payload;
+}
+
 export async function createPostComment(postId: string, message: string, token: string) {
   return request(
     `/posts/${postId}/comments`,
     {
       method: 'POST',
       body: JSON.stringify({ message }),
+    },
+    token,
+  );
+}
+
+export async function togglePostLike(postId: string, liked: boolean, token: string) {
+  return request(
+    `/posts/${postId}/${liked ? 'like' : 'unlike'}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({}),
     },
     token,
   );
@@ -884,6 +970,8 @@ export async function updateProfile(
     location?: string;
     website?: string;
     about?: string;
+    avatarUrl?: string;
+    coverImageUrl?: string;
   },
   token: string,
 ) {
@@ -894,8 +982,10 @@ export async function updateProfile(
       body: JSON.stringify({
         name: input.name,
         bio: input.about,
+        avatarUrl: input.avatarUrl,
         location: input.location,
         website: input.website,
+        coverImageUrl: input.coverImageUrl,
       }),
     },
     token,

@@ -24,7 +24,13 @@ export function ReelsPage() {
           {app.data.reels.map((reel) => (
             <Card key={reel.id} className="overflow-hidden p-0">
               <div className="relative">
-                <img src={reel.thumbnail} alt={reel.caption} className="h-[420px] w-full object-cover" />
+                {reel.thumbnail ? (
+                  <img src={reel.thumbnail} alt={reel.caption} className="h-[420px] w-full object-cover" />
+                ) : (
+                  <div className="flex h-[420px] w-full items-end bg-[linear-gradient(160deg,#0f172a,#0ea5e9,#22c55e)] p-5">
+                    <p className="line-clamp-5 text-lg font-semibold text-white">{reel.caption}</p>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-between p-4 text-white">
                   <div className="min-w-0">

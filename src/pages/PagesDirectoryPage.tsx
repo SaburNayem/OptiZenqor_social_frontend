@@ -16,6 +16,7 @@ export function PagesDirectoryPage() {
   const [about, setAbout] = useState('');
   const [category, setCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [followingId, setFollowingId] = useState<string | null>(null);
 
   async function handleCreatePage() {
     if (!app.session?.accessToken || !viewer?.id || !name.trim() || !about.trim() || !category.trim()) {
@@ -42,6 +43,18 @@ export function PagesDirectoryPage() {
     }
   }
 
+  async function handleToggleFollow(pageId: string) {
+    if (!app.session?.accessToken) {
+      return;
+    }
+    setFollowingId(pageId);
+    try {
+      await app.togglePageFollow(pageId);
+    } finally {
+      setFollowingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -63,11 +76,22 @@ export function PagesDirectoryPage() {
             <p className="text-lg font-semibold text-slate-950 dark:text-white">{page.name}</p>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{page.category}</p>
             <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{page.description}</p>
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">{page.followers} followers</span>
-              <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300">
-                {page.actionLabel}
-              </span>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <span className="text-sm text-slate-500 dark:text-slate-400">{page.followers} followers</span>
+              <Button
+                size="sm"
+                variant={page.followed ? 'secondary' : 'primary'}
+                disabled={!app.session?.accessToken || followingId === page.id}
+                onClick={() => void handleToggleFollow(page.id)}
+              >
+                {followingId === page.id
+                  ? 'Updating...'
+                  : page.followed
+                    ? 'Following'
+                    : app.session?.accessToken
+                      ? page.actionLabel
+                      : 'Login to follow'}
+              </Button>
             </div>
           </Card>
         ))}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   buildExploreClusters,
   createPost as createPostApi,
+  createPostWithMedia as createPostWithMediaApi,
   createPostComment as createPostCommentApi,
   fetchCalls,
   fetchDashboard,
@@ -15,12 +16,17 @@ import {
   fetchProfile,
   fetchSettings,
   forgotPassword as forgotPasswordApi,
+  joinCommunity as joinCommunityApi,
   login as loginApi,
   markNotificationRead as markNotificationReadApi,
-  joinCommunity as joinCommunityApi,
   sendThreadMessage as sendThreadMessageApi,
   signup as signupApi,
+  toggleEventRsvp as toggleEventRsvpApi,
+  toggleEventSave as toggleEventSaveApi,
   toggleFollowUser as toggleFollowUserApi,
+  togglePageFollow as togglePageFollowApi,
+  togglePostLike as togglePostLikeApi,
+  uploadAsset as uploadAssetApi,
   updateProfile as updateProfileApi,
 } from '../lib/api';
 import { readSession, writeSession } from '../lib/session';
@@ -154,11 +160,10 @@ function mergeDashboardIntoData(
     reels: dashboard.reels.length > 0 ? dashboard.reels : base.reels,
     suggestions:
       dashboard.userSuggestions.length > 0
-        ? dashboard.userSuggestions.map((user, index) => ({
+        ? dashboard.userSuggestions.map((user) => ({
             id: `suggestion-api-${user.id}`,
             user,
-            reason: ['Because you searched similar people', 'Popular in your network', 'Suggested from your communities'][index % 3],
-            mutualCount: 3 + index * 2,
+            reason: user.bio || user.location || user.role,
             following: false,
           }))
         : base.suggestions,
@@ -310,7 +315,7 @@ export function useSocialApp(): SocialAppState {
           post.tags.some((tag) => includesSearch(tag, query)),
       ),
       suggestions: data.suggestions.filter(
-        (item) => includesSearch(item.user.name, query) || includesSearch(item.reason, query),
+        (item) => includesSearch(item.user.name, query) || includesSearch(item.reason ?? '', query),
       ),
       trends: data.trends.filter(
         (trend) => includesSearch(trend.topic, query) || includesSearch(trend.detail, query),
@@ -437,25 +442,55 @@ export function useSocialApp(): SocialAppState {
     setAuthMessage('Signed out successfully.');
   }
 
-  async function createPost(input: { content: string; mediaType: 'text' | 'image' | 'video' }): Promise<AuthResult> {
+  async function createPost(input: {
+    content: string;
+    mediaType: 'text' | 'image' | 'video';
+    files?: File[];
+  }): Promise<AuthResult> {
     if (!input.content.trim()) {
       return { ok: false, message: 'Write something before posting.' };
     }
     if (!session?.accessToken) {
       return { ok: false, message: 'Sign in to publish posts.' };
     }
-    if (input.mediaType !== 'text') {
-      return {
-        ok: false,
-        message: 'Web post attachments are not wired yet. Publish a text update for now.',
-      };
-    }
     const tags = input.content.match(/#[a-zA-Z0-9_]+/g)?.map((tag) => tag.replace('#', '')) ?? [];
 
     try {
-      await createPostApi({ caption: input.content.trim(), tags }, session.accessToken);
+      const files = input.files?.filter((file) => file.size > 0) ?? [];
+      if (input.mediaType !== 'text' && files.length === 0) {
+        return {
+          ok: false,
+          message: `Choose at least one ${input.mediaType} file before publishing.`,
+        };
+      }
+
+      if (files.length === 0) {
+        await createPostApi({ caption: input.content.trim(), tags }, session.accessToken);
+      } else {
+        const uploadedMedia = await Promise.all(
+          files.map((file, index) =>
+            uploadAssetApi(file, session.accessToken, {
+              folder: `optizenqor/web-posts/${session.user.id || 'member'}`,
+              publicId: `web-post-${Date.now()}-${index}`,
+              resourceType: input.mediaType === 'video' ? 'video' : 'image',
+            }),
+          ),
+        );
+        await createPostWithMediaApi(
+          {
+            caption: input.content.trim(),
+            tags,
+            media: uploadedMedia.map((item) => item.url),
+          },
+          session.accessToken,
+        );
+      }
       await refresh({ silent: true });
-      return { ok: true, message: 'Post published from backend data.' };
+      return {
+        ok: true,
+        message:
+          files.length > 0 ? 'Post with uploaded media published from backend data.' : 'Post published from backend data.',
+      };
     } catch (error) {
       return {
         ok: false,
@@ -471,12 +506,30 @@ export function useSocialApp(): SocialAppState {
     }));
   }
 
-  function toggleLike(postId: string) {
+  async function toggleLike(postId: string) {
+    if (!session?.accessToken) {
+      setAuthMessage('Sign in to like posts.');
+      return;
+    }
+
+    const previousPost = data.posts.find((item) => item.id === postId);
+    if (!previousPost) {
+      return;
+    }
+
     updatePost(postId, (post) => ({
       ...post,
       liked: !post.liked,
       likes: post.likes + (post.liked ? -1 : 1),
     }));
+
+    try {
+      await togglePostLikeApi(postId, !previousPost.liked, session.accessToken);
+      await refresh({ silent: true });
+    } catch (error) {
+      updatePost(postId, () => previousPost);
+      setAuthMessage(error instanceof Error ? error.message : 'Unable to update post like right now.');
+    }
   }
 
   function toggleSave(postId: string) {
@@ -582,50 +635,165 @@ export function useSocialApp(): SocialAppState {
     }
   }
 
-  function updateProfile(
-    input: Partial<ViewerUser> & { about?: string; website?: string; location?: string },
-  ) {
-    setData((current) => ({
-      ...current,
-      profile: {
-        ...current.profile,
-        user: {
-          ...current.profile.user,
-          ...input,
-          bio: input.about ?? input.bio ?? current.profile.user.bio,
-        },
-        about: input.about ?? current.profile.about,
-        website: input.website ?? current.profile.website,
-        location: input.location ?? current.profile.location,
-      },
-    }));
-
-    if (session) {
-      const nextSession = {
-        ...session,
-        user: {
-          ...session.user,
-          ...input,
-          bio: input.about ?? input.bio ?? session.user.bio,
-        },
-      };
-      setSession(nextSession);
-      writeSession(nextSession);
+  async function toggleEventRsvp(eventId: string) {
+    if (!session?.accessToken) {
+      return;
     }
 
-    if (session?.accessToken) {
-      void updateProfileApi(
+    const previousEvent = data.events.find((item) => item.id === eventId);
+    if (!previousEvent) {
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      events: current.events.map((item) =>
+        item.id === eventId
+          ? {
+              ...item,
+              rsvped: !item.rsvped,
+              attendeeCount: item.rsvped ? Math.max(0, item.attendeeCount - 1) : item.attendeeCount + 1,
+            }
+          : item,
+      ),
+    }));
+
+    try {
+      await toggleEventRsvpApi(eventId, session.accessToken);
+      await refresh({ silent: true });
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        events: current.events.map((item) => (item.id === eventId ? previousEvent : item)),
+      }));
+      setAuthMessage(error instanceof Error ? error.message : 'Unable to update RSVP right now.');
+    }
+  }
+
+  async function toggleEventSave(eventId: string) {
+    if (!session?.accessToken) {
+      return;
+    }
+
+    const previousEvent = data.events.find((item) => item.id === eventId);
+    if (!previousEvent) {
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      events: current.events.map((item) =>
+        item.id === eventId
+          ? {
+              ...item,
+              saved: !item.saved,
+            }
+          : item,
+      ),
+    }));
+
+    try {
+      await toggleEventSaveApi(eventId, session.accessToken);
+      await refresh({ silent: true });
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        events: current.events.map((item) => (item.id === eventId ? previousEvent : item)),
+      }));
+      setAuthMessage(error instanceof Error ? error.message : 'Unable to update saved event state right now.');
+    }
+  }
+
+  async function togglePageFollow(pageId: string) {
+    if (!session?.accessToken) {
+      return;
+    }
+
+    const previousPage = data.pages.find((item) => item.id === pageId);
+    if (!previousPage) {
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      pages: current.pages.map((item) =>
+        item.id === pageId
+          ? {
+              ...item,
+              followed: !item.followed,
+              followers: item.followed ? Math.max(0, item.followers - 1) : item.followers + 1,
+              actionLabel: item.followed ? 'Follow' : 'Following',
+            }
+          : item,
+      ),
+    }));
+
+    try {
+      await togglePageFollowApi(pageId, session.accessToken);
+      await refresh({ silent: true });
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        pages: current.pages.map((item) => (item.id === pageId ? previousPage : item)),
+      }));
+      setAuthMessage(error instanceof Error ? error.message : 'Unable to update page follow state right now.');
+    }
+  }
+
+  async function updateProfile(
+    input: Partial<ViewerUser> & {
+      about?: string;
+      website?: string;
+      location?: string;
+      avatarFile?: File | null;
+      coverFile?: File | null;
+    },
+  ): Promise<AuthResult> {
+    if (!session?.accessToken) {
+      return { ok: false, message: 'Sign in to update your profile.' };
+    }
+
+    try {
+      let avatarUrl: string | undefined;
+      let coverImageUrl: string | undefined;
+
+      if (input.avatarFile) {
+        const uploadedAvatar = await uploadAssetApi(input.avatarFile, session.accessToken, {
+          folder: `optizenqor/profile/${session.user.id || 'member'}/avatar`,
+          publicId: `profile-avatar-${Date.now()}`,
+          resourceType: 'image',
+        });
+        avatarUrl = uploadedAvatar.url;
+      }
+
+      if (input.coverFile) {
+        const uploadedCover = await uploadAssetApi(input.coverFile, session.accessToken, {
+          folder: `optizenqor/profile/${session.user.id || 'member'}/cover`,
+          publicId: `profile-cover-${Date.now()}`,
+          resourceType: 'image',
+        });
+        coverImageUrl = uploadedCover.url;
+      }
+
+      await updateProfileApi(
         {
           name: input.name,
           headline: input.headline,
           location: input.location,
           website: input.website,
           about: input.about,
+          avatarUrl,
+          coverImageUrl,
         },
         session.accessToken,
-      )
-        .then(() => refresh({ silent: true }))
-        .catch(() => undefined);
+      );
+      await refresh({ silent: true });
+      return { ok: true, message: 'Profile updated from backend data.' };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to update your profile right now.';
+      setAuthMessage(message);
+      return { ok: false, message };
     }
   }
 
@@ -659,6 +827,9 @@ export function useSocialApp(): SocialAppState {
     sendMessage,
     toggleFollowSuggestion,
     joinCommunity,
+    toggleEventRsvp,
+    toggleEventSave,
+    togglePageFollow,
     updateProfile,
   };
 }

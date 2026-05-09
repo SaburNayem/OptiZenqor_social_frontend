@@ -9,7 +9,7 @@ import { formatCompactNumber } from '../../lib/utils';
 interface PostCardProps {
   post: SocialPost;
   viewer: ViewerUser | null;
-  onLike: (id: string) => void;
+  onLike: (id: string) => Promise<void>;
   onSave: (id: string) => void;
   onComment: (id: string, message: string) => Promise<void>;
 }
@@ -92,7 +92,7 @@ export function PostCard({ post, viewer, onLike, onSave, onComment }: PostCardPr
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Button variant={post.liked ? 'primary' : 'secondary'} size="sm" onClick={() => onLike(post.id)}>
+        <Button variant={post.liked ? 'primary' : 'secondary'} size="sm" onClick={() => void onLike(post.id)}>
           <Heart className="h-4 w-4" />
           Like
         </Button>

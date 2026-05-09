@@ -1,4 +1,4 @@
-import { UserPlus, UserCheck } from 'lucide-react';
+import { UserCheck, UserPlus } from 'lucide-react';
 import { SuggestionItem } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
@@ -9,6 +9,10 @@ interface UserSuggestionProps {
 }
 
 export function UserSuggestion({ suggestion, onToggle }: UserSuggestionProps) {
+  const detail = [suggestion.reason, suggestion.mutualCount ? `${suggestion.mutualCount} mutuals` : null]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-3xl border border-slate-200/70 bg-white/60 p-3 dark:border-slate-800 dark:bg-slate-950/40">
       <div className="flex min-w-0 items-center gap-3">
@@ -17,9 +21,9 @@ export function UserSuggestion({ suggestion, onToggle }: UserSuggestionProps) {
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
             {suggestion.user.name}
           </p>
-          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-            {suggestion.reason} · {suggestion.mutualCount} mutuals
-          </p>
+          {detail ? (
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{detail}</p>
+          ) : null}
         </div>
       </div>
       <Button

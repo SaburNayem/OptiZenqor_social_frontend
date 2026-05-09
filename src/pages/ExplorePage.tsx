@@ -22,7 +22,15 @@ export function ExplorePage() {
       <section className="grid gap-4 lg:grid-cols-3">
         {app.data.explore.map((cluster) => (
           <Card key={cluster.id} className="overflow-hidden p-0">
-            <img src={cluster.image} alt={cluster.title} className="h-44 w-full object-cover" />
+            {cluster.image ? (
+              <img src={cluster.image} alt={cluster.title} className="h-44 w-full object-cover" />
+            ) : (
+              <div className="flex h-44 w-full items-end bg-[linear-gradient(135deg,#0f172a,#0ea5e9,#f97316)] p-5">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80">
+                  {cluster.stat}
+                </p>
+              </div>
+            )}
             <div className="p-5">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{cluster.stat}</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">{cluster.title}</h2>

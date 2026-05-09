@@ -1,5 +1,6 @@
 import { Bell, BriefcaseBusiness, ImagePlus, Users } from 'lucide-react';
 import { DashboardStats, ViewerUser } from '../types';
+import { Avatar } from './ui/Avatar';
 
 interface LeftSidebarProps {
   user: ViewerUser | null;
@@ -20,14 +21,7 @@ const LeftSidebar = ({ user, stats, apiBaseUrl }: LeftSidebarProps) => {
       <div className="panel-surface sticky top-24">
         <div className="rounded-[28px] bg-[radial-gradient(circle_at_top_left,_rgba(29,155,240,0.18),_transparent_42%),linear-gradient(135deg,#f8fbff,#ffffff)] p-5">
           <div className="flex items-center gap-3">
-            <img
-              src={
-                user?.avatar ||
-                'https://ui-avatars.com/api/?name=Socity+Member&background=0f172a&color=ffffff'
-              }
-              alt={user?.name || 'Member'}
-              className="h-14 w-14 rounded-2xl object-cover"
-            />
+            <Avatar src={user?.avatar || ''} alt={user?.name || 'Member'} size="lg" />
             <div>
               <p className="text-sm font-semibold text-slate-900">{user?.name || 'Socity Member'}</p>
               <p className="text-xs text-slate-500">{user?.role || 'Authenticated user'}</p>

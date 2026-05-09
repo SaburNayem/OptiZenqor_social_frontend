@@ -75,7 +75,7 @@ export interface FeedPostView {
 export interface ReelView {
   id: string;
   caption: string;
-  thumbnail: string;
+  thumbnail?: string;
   audioName: string;
   likes: number;
   comments: number;
@@ -240,8 +240,8 @@ export interface SocialPost extends FeedPostView {
 export interface SuggestionItem {
   id: string;
   user: ViewerUser;
-  reason: string;
-  mutualCount: number;
+  reason?: string;
+  mutualCount?: number;
   following: boolean;
 }
 
@@ -310,7 +310,7 @@ export interface ExploreCluster {
   id: string;
   title: string;
   description: string;
-  image: string;
+  image?: string;
   stat: string;
 }
 
@@ -368,8 +368,12 @@ export interface SocialAppState {
   register: (input: { name: string; email: string; password: string }) => Promise<AuthResult>;
   sendResetLink: (email: string) => Promise<AuthResult>;
   logout: () => void;
-  createPost: (input: { content: string; mediaType: 'text' | 'image' | 'video' }) => Promise<AuthResult>;
-  toggleLike: (postId: string) => void;
+  createPost: (input: {
+    content: string;
+    mediaType: 'text' | 'image' | 'video';
+    files?: File[];
+  }) => Promise<AuthResult>;
+  toggleLike: (postId: string) => Promise<void>;
   toggleSave: (postId: string) => void;
   addComment: (postId: string, message: string) => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
@@ -380,7 +384,13 @@ export interface SocialAppState {
   toggleEventRsvp: (eventId: string) => Promise<void>;
   toggleEventSave: (eventId: string) => Promise<void>;
   togglePageFollow: (pageId: string) => Promise<void>;
-  updateProfile: (input: Partial<UserProfile['user']> & { about?: string; website?: string; location?: string }) => void;
+  updateProfile: (input: Partial<UserProfile['user']> & {
+    about?: string;
+    website?: string;
+    location?: string;
+    avatarFile?: File | null;
+    coverFile?: File | null;
+  }) => Promise<AuthResult>;
 }
 
 export interface ThemeState {

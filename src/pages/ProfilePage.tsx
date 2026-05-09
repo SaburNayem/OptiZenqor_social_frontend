@@ -34,10 +34,13 @@ export function ProfilePage() {
   const [coverPreview, setCoverPreview] = useState(app.data.profile.coverImage);
   const [coverPosition, setCoverPosition] = useState(50);
   const [name, setName] = useState(app.data.profile.user.name);
-  const [headline, setHeadline] = useState(app.data.profile.user.headline ?? app.data.profile.headline);
   const [location, setLocation] = useState(app.data.profile.location);
   const [website, setWebsite] = useState(app.data.profile.website);
   const [about, setAbout] = useState(app.data.profile.about);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const isDraggingCoverRef = useRef(false);
@@ -63,11 +66,13 @@ export function ProfilePage() {
   function handleImagePick(
     event: ChangeEvent<HTMLInputElement>,
     onPreview: (value: string) => void,
+    onFile: (file: File) => void,
   ) {
     const file = event.target.files?.[0];
     if (!file) {
       return;
     }
+    onFile(file);
     onPreview(URL.createObjectURL(file));
   }
 
@@ -198,7 +203,7 @@ export function ProfilePage() {
             accept="image/*"
             className="hidden"
             onChange={(event) => {
-              handleImagePick(event, setCoverPreview);
+              handleImagePick(event, setCoverPreview, setCoverFile);
               setCoverEditOpen(true);
             }}
           />
@@ -207,7 +212,7 @@ export function ProfilePage() {
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(event) => handleImagePick(event, setAvatarPreview)}
+            onChange={(event) => handleImagePick(event, setAvatarPreview, setAvatarFile)}
           />
 
           <div className="-mt-16 flex items-end gap-4">
@@ -322,7 +327,6 @@ export function ProfilePage() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Display name" value={name} onChange={(event) => setName(event.target.value)} />
-          <Input label="Headline" value={headline} onChange={(event) => setHeadline(event.target.value)} />
           <Input label="Location" value={location} onChange={(event) => setLocation(event.target.value)} />
           <Input label="Website" value={website} onChange={(event) => setWebsite(event.target.value)} />
         </div>
@@ -340,20 +344,31 @@ export function ProfilePage() {
             Cancel
           </Button>
           <Button
-            onClick={() => {
-              app.updateProfile({
+            onClick={async () => {
+              setIsSaving(true);
+              const result = await app.updateProfile({
                 name,
-                headline,
                 location,
                 website,
                 about,
+                avatarFile,
+                coverFile,
               });
-              setOpen(false);
+              setSaveMessage(result.message);
+              setIsSaving(false);
+              if (result.ok) {
+                setAvatarFile(null);
+                setCoverFile(null);
+                setOpen(false);
+                setCoverEditOpen(false);
+              }
             }}
+            disabled={isSaving}
           >
-            Save changes
+            {isSaving ? 'Saving...' : 'Save changes'}
           </Button>
         </div>
+        {saveMessage ? <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{saveMessage}</p> : null}
       </Modal>
     </div>
   );
