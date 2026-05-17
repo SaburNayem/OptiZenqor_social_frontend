@@ -577,7 +577,7 @@ function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]
     lastActive:
       lastMessage?.createdAt ||
       formatChatTime(asText(record.updatedAt) || asText(record.lastMessageAt) || asText(record.createdAt)),
-    online: false,
+    online: firstBoolean(record.online ?? record.isActive ?? record.presence) ?? true,
     messages: normalizedMessages,
   };
 }

@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { StoryView } from '../types';
 
 interface StoriesRowProps {
@@ -35,9 +36,15 @@ const StoriesRow = ({ stories }: StoriesRowProps) => {
             </article>
           ))
         ) : (
-          <div className="rounded-3xl bg-slate-50 px-5 py-10 text-sm text-slate-500">
-            No active stories were returned by `/stories`.
-          </div>
+          <article className="min-w-[210px] rounded-[28px] border border-dashed border-slate-200 bg-slate-50 p-5 text-slate-600 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+              <Plus className="h-5 w-5" />
+            </div>
+            <h3 className="mt-10 text-lg font-semibold text-slate-900">Add story</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              No stories are live yet. Tap here to add your first story circle.
+            </p>
+          </article>
         )}
       </div>
     </section>
