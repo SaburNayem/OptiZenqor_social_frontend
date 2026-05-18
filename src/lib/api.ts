@@ -12,6 +12,7 @@ import {
   NotificationView,
   PageView,
   ReelView,
+  RuntimeConfig,
   SearchItemView,
   SessionState,
   SettingsGroup,
@@ -112,6 +113,14 @@ function pickObject(payload: unknown) {
   return isRecord(payload) ? payload : {};
 }
 
+export function readBackendList(payload: unknown, key?: string) {
+  return pickList(payload, key);
+}
+
+export function readBackendObject(payload: unknown) {
+  return pickObject(payload);
+}
+
 function buildNetworkErrorMessage(error: unknown) {
   if (!API_BASE_URL) {
     return 'VITE_API_BASE_URL is missing. Configure the public web frontend to point at the backend before loading production data.';
@@ -168,6 +177,42 @@ async function request(path: string, init: RequestInit = {}, token?: string) {
   }
 
   return body;
+}
+
+export async function fetchBackendFeature(path: string, token?: string) {
+  return request(path, {}, token);
+}
+
+export async function postBackendFeature(path: string, body: JsonRecord = {}, token?: string) {
+  return request(
+    path,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+    token,
+  );
+}
+
+export async function patchBackendFeature(path: string, body: JsonRecord = {}, token?: string) {
+  return request(
+    path,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    },
+    token,
+  );
+}
+
+export async function deleteBackendFeature(path: string, token?: string) {
+  return request(
+    path,
+    {
+      method: 'DELETE',
+    },
+    token,
+  );
 }
 
 function normalizeUser(raw: unknown): ViewerUser {
@@ -548,6 +593,35 @@ function normalizeSettings(raw: unknown): SettingsGroup[] {
       items,
     };
   });
+}
+
+function normalizeRuntimeConfig(raw: unknown): RuntimeConfig {
+  const record = pickObject(raw);
+  const runtimeConfig = isRecord(record.runtimeConfig) ? record.runtimeConfig : record;
+  const web = isRecord(runtimeConfig.web) ? runtimeConfig.web : {};
+  const navigation = toArray(web.navigation)
+    .map((item) => (isRecord(item) ? item : {}))
+    .map((item) => ({
+      key: asText(item.key),
+      label: asText(item.label),
+      path: asText(item.path),
+      visible: asBoolean(item.visible, true),
+      requiresAuth: asBoolean(item.requiresAuth, true),
+      sortOrder: asNumber(item.sortOrder),
+      settingKey: asText(item.settingKey) || undefined,
+    }))
+    .filter((item) => item.key.length > 0)
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+
+  return {
+    generatedAt: asText(runtimeConfig.generatedAt),
+    web: {
+      navigation,
+      hiddenRoutes: toArray(web.hiddenRoutes).filter((item): item is string => typeof item === 'string'),
+    },
+    appConfig: toArray(runtimeConfig.appConfig).filter(isRecord),
+    featureFlags: toArray(runtimeConfig.featureFlags).filter(isRecord),
+  };
 }
 
 function normalizeChatThread(raw: unknown, viewerId: string, messages: unknown[]): ChatThread {
@@ -1065,8 +1139,13 @@ export async function sendThreadMessage(threadId: string, text: string, token: s
 }
 
 export async function fetchSettings(token: string) {
-  const payload = await request('/settings/state', {}, token);
+  const payload = await request('/settings/sections', {}, token);
   return normalizeSettings(payload);
+}
+
+export async function fetchRuntimeConfig(token?: string) {
+  const payload = await request('/app/config', {}, token);
+  return normalizeRuntimeConfig(payload);
 }
 
 export async function fetchMarketplace(token?: string) {

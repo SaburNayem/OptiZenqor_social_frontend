@@ -29,12 +29,13 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { AppOutletContext } from '../types';
 import { Avatar } from '../components/ui/Avatar';
 import { Card } from '../components/ui/Card';
+import { utilityNavGroups } from '../config/utilityNavigation';
 
 const headerCenterItems = [
-  { to: '/', label: 'Home', icon: Home },
-  { to: '/reels', label: 'Reels', icon: PlaySquare },
-  { to: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
-  { to: '/marketplace', label: 'Marketplace', icon: Package },
+  { to: '/', label: 'Home', icon: Home, featureKey: 'home' },
+  { to: '/reels', label: 'Reels', icon: PlaySquare, featureKey: 'reels' },
+  { to: '/jobs', label: 'Jobs', icon: BriefcaseBusiness, featureKey: 'jobs' },
+  { to: '/marketplace', label: 'Marketplace', icon: Package, featureKey: 'marketplace' },
 ];
 
 const sidebarSections = [
@@ -42,42 +43,47 @@ const sidebarSections = [
     title: 'Create & Manage',
     subtitle: 'Publishing tools and saved workspaces.',
     items: [
-      { to: '/drafts', label: 'Drafts', icon: FileText },
-      { to: '/scheduling', label: 'Scheduling', icon: Clock3 },
-      { to: '/upload-manager', label: 'Upload Manager', icon: CloudUpload },
-      { to: '/bookmarks', label: 'Saved Posts', icon: Bookmark },
-      { to: '/archive', label: 'Archive Center', icon: Archive },
+      { to: '/drafts', label: 'Drafts', icon: FileText, featureKey: 'drafts' },
+      { to: '/scheduling', label: 'Scheduling', icon: Clock3, featureKey: 'scheduling' },
+      { to: '/upload-manager', label: 'Upload Manager', icon: CloudUpload, featureKey: 'upload-manager' },
+      { to: '/bookmarks', label: 'Saved Posts', icon: Bookmark, featureKey: 'bookmarks' },
+      { to: '/archive', label: 'Archive Center', icon: Archive, featureKey: 'archive' },
     ],
   },
   {
     title: 'Discover',
     subtitle: 'Explore communities, pages, and live surfaces.',
     items: [
-      { to: '/communities', label: 'Communities', icon: Users },
-      { to: '/groups', label: 'Groups', icon: UserCircle2 },
-      { to: '/pages', label: 'Pages', icon: LayoutGrid },
-      { to: '/marketplace', label: 'Marketplace', icon: Package },
-      { to: '/events', label: 'Events', icon: CalendarDays },
-      { to: '/live-streams', label: 'Live Stream', icon: Video },
+      { to: '/communities', label: 'Communities', icon: Users, featureKey: 'communities' },
+      { to: '/groups', label: 'Groups', icon: UserCircle2, featureKey: 'groups' },
+      { to: '/pages', label: 'Pages', icon: LayoutGrid, featureKey: 'pages' },
+      { to: '/marketplace', label: 'Marketplace', icon: Package, featureKey: 'marketplace' },
+      { to: '/events', label: 'Events', icon: CalendarDays, featureKey: 'events' },
+      { to: '/live-streams', label: 'Live Stream', icon: Video, featureKey: 'live-streams' },
     ],
   },
   {
     title: 'Growth & Account',
     subtitle: 'Creator, monetization, and trust workflows from the app.',
     items: [
-      { to: '/creator-tools', label: 'Creator Tools', icon: PlaySquare },
-      { to: '/wallet', label: 'Wallet', icon: Wallet },
-      { to: '/subscriptions', label: 'Subscriptions', icon: Folder },
-      { to: '/verification', label: 'Verification', icon: ShieldCheck },
-      { to: '/invite-referral', label: 'Invite Referral', icon: Bell },
+      { to: '/creator-tools', label: 'Creator Tools', icon: PlaySquare, featureKey: 'creator-tools' },
+      { to: '/wallet', label: 'Wallet', icon: Wallet, featureKey: 'wallet' },
+      { to: '/subscriptions', label: 'Subscriptions', icon: Folder, featureKey: 'subscriptions' },
+      { to: '/verification', label: 'Verification', icon: ShieldCheck, featureKey: 'verification' },
+      { to: '/invite-referral', label: 'Invite Referral', icon: Bell, featureKey: 'invite-referral' },
     ],
   },
+  ...utilityNavGroups.map((group) => ({
+    title: group.title,
+    subtitle: 'Additional app parity surfaces backed by API routes.',
+    items: [...group.items],
+  })),
 ];
 
 const sidebarFooterItems = [
-  { to: '/group-chat', label: 'Group Chat', icon: Users, tone: 'default' as const },
-  { to: '/settings', label: 'Settings', icon: Settings, tone: 'default' as const },
-  { to: '/support', label: 'Help & Support', icon: CircleHelp, tone: 'default' as const },
+  { to: '/group-chat', label: 'Group Chat', icon: Users, tone: 'default' as const, featureKey: 'group-chat' },
+  { to: '/settings', label: 'Settings', icon: Settings, tone: 'default' as const, featureKey: 'settings' },
+  { to: '/support', label: 'Help & Support', icon: CircleHelp, tone: 'default' as const, featureKey: 'support' },
 ];
 
 interface AppLayoutProps {
@@ -89,6 +95,18 @@ export function AppLayout({ context }: AppLayoutProps) {
   const viewer = context.app.session?.user ?? context.app.data.profile.user;
   const activeBuddies = context.app.data.chats.filter((chat) => chat.online);
   const inactiveBuddies = context.app.data.chats.filter((chat) => !chat.online);
+  const visibleHeaderItems = headerCenterItems.filter((item) =>
+    context.app.isFeatureVisible(item.featureKey),
+  );
+  const visibleSidebarSections = sidebarSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => context.app.isFeatureVisible(item.featureKey)),
+    }))
+    .filter((section) => section.items.length > 0);
+  const visibleFooterItems = sidebarFooterItems.filter((item) =>
+    context.app.isFeatureVisible(item.featureKey),
+  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-app text-slate-900 dark:bg-app-dark dark:text-white">
@@ -111,7 +129,7 @@ export function AppLayout({ context }: AppLayoutProps) {
           </div>
 
           <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto lg:flex">
-            {headerCenterItems.map((item) => {
+            {visibleHeaderItems.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink
@@ -133,41 +151,45 @@ export function AppLayout({ context }: AppLayoutProps) {
           </nav>
 
           <div className="ml-auto flex items-center gap-1">
-            <NavLink
-              to="/notifications"
-              className={({ isActive }) =>
-                `relative flex h-9 w-9 items-center justify-center rounded-full transition ${
-                  isActive
-                    ? 'bg-[#0F766E] text-white dark:bg-[#169388]'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 ? (
-                <span className="absolute -right-1 -top-1 rounded-full bg-[#0F766E] px-1.5 py-0.5 text-[10px] font-bold text-white dark:bg-[#169388]">
-                  {unreadCount}
-                </span>
-              ) : null}
-            </NavLink>
-            <NavLink
-              to="/messages"
-              className={({ isActive }) =>
-                `flex h-9 w-9 items-center justify-center rounded-full transition ${
-                  isActive
-                    ? 'bg-[#0F766E] text-white dark:bg-[#169388]'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <MessageSquareMore className="h-4 w-4" />
-            </NavLink>
+            {context.app.isFeatureVisible('notifications') ? (
+              <NavLink
+                to="/notifications"
+                className={({ isActive }) =>
+                  `relative flex h-9 w-9 items-center justify-center rounded-full transition ${
+                    isActive
+                      ? 'bg-[#0F766E] text-white dark:bg-[#169388]'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`
+                }
+              >
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 rounded-full bg-[#0F766E] px-1.5 py-0.5 text-[10px] font-bold text-white dark:bg-[#169388]">
+                    {unreadCount}
+                  </span>
+                ) : null}
+              </NavLink>
+            ) : null}
+            {context.app.isFeatureVisible('messages') ? (
+              <NavLink
+                to="/messages"
+                className={({ isActive }) =>
+                  `flex h-9 w-9 items-center justify-center rounded-full transition ${
+                    isActive
+                      ? 'bg-[#0F766E] text-white dark:bg-[#169388]'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`
+                }
+              >
+                <MessageSquareMore className="h-4 w-4" />
+              </NavLink>
+            ) : null}
           </div>
         </div>
 
         <div className="w-full px-2 pb-3 sm:px-3 lg:hidden lg:px-5">
           <nav className="flex items-center gap-2 overflow-x-auto">
-            {headerCenterItems.map((item) => {
+            {visibleHeaderItems.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink
@@ -211,7 +233,7 @@ export function AppLayout({ context }: AppLayoutProps) {
               </NavLink>
 
               <div className="space-y-6 px-6 py-5">
-              {sidebarSections.map((section) => (
+              {visibleSidebarSections.map((section) => (
                 <div key={section.title}>
                   <div className="pb-2">
                     <p className="text-[18px] font-medium text-[#2c7a72] dark:text-[#7cc6bd]">{section.title}</p>
@@ -248,7 +270,7 @@ export function AppLayout({ context }: AppLayoutProps) {
 
                 <div className="border-t border-slate-200/70 pt-5 dark:border-slate-800">
                   <div className="space-y-1">
-                    {sidebarFooterItems.map((item) => {
+                    {visibleFooterItems.map((item) => {
                       const Icon = item.icon;
                       return (
                         <NavLink

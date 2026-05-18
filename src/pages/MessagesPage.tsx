@@ -110,15 +110,23 @@ export function MessagesPage() {
                     alt={selectedChat.participant.name}
                     size="lg"
                   />
-                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-950" />
+                  {selectedChat.online ? (
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-950" />
+                  ) : null}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-lg font-semibold text-slate-950 dark:text-white">
                     {selectedChat.participant.name}
                   </p>
                   <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                    <Circle className="h-2.5 w-2.5 fill-emerald-400 text-emerald-400" />
-                    <span>Active now</span>
+                    <Circle
+                      className={
+                        selectedChat.online
+                          ? 'h-2.5 w-2.5 fill-emerald-400 text-emerald-400'
+                          : 'h-2.5 w-2.5 text-slate-400'
+                      }
+                    />
+                    <span>{selectedChat.online ? 'Active now' : selectedChat.lastActive}</span>
                     <span>&middot;</span>
                     <span>{selectedChat.roleLabel}</span>
                   </div>
@@ -157,7 +165,7 @@ export function MessagesPage() {
                       Start the conversation
                     </p>
                     <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      Say hello first. New chats will keep a starter note here so the thread never feels empty.
+                      Send a message and the saved backend thread will appear here after refresh.
                     </p>
                   </div>
                 </div>

@@ -15,6 +15,7 @@ import {
   fetchMe,
   fetchPages,
   fetchProfile,
+  fetchRuntimeConfig,
   fetchSettings,
   forgotPassword as forgotPasswordApi,
   joinCommunity as joinCommunityApi,
@@ -35,9 +36,9 @@ import { readSession, writeSession } from '../lib/session';
 import {
   AppNotification,
   AuthResult,
-  ChatMessage,
   ChatThread,
   DashboardData,
+  RuntimeConfig,
   SessionState,
   SocialAppData,
   SocialAppState,
@@ -104,6 +105,47 @@ function createEmptyData(viewer: ViewerUser): SocialAppData {
   };
 }
 
+function createEmptyRuntimeConfig(): RuntimeConfig {
+  return {
+    generatedAt: '',
+    web: {
+      navigation: [],
+      hiddenRoutes: [],
+    },
+    appConfig: [],
+    featureFlags: [],
+  };
+}
+
+function isRuntimeFeatureVisible(config: RuntimeConfig, featureKey: string) {
+  const normalized = featureKey.trim().toLowerCase();
+  const entry = config.web.navigation.find(
+    (item) => item.key.toLowerCase() === normalized,
+  );
+  return entry ? entry.visible : true;
+}
+
+function applyRuntimeVisibility(data: SocialAppData, config: RuntimeConfig): SocialAppData {
+  const visible = (featureKey: string) => isRuntimeFeatureVisible(config, featureKey);
+  return {
+    ...data,
+    stories: visible('stories') ? data.stories : [],
+    reels: visible('reels') ? data.reels : [],
+    marketplace: visible('marketplace') ? data.marketplace : [],
+    notifications: visible('notifications') ? data.notifications : [],
+    chats: visible('messages') ? data.chats : [],
+    calls: visible('calls') ? data.calls : [],
+    liveStreams: visible('live-streams') ? data.liveStreams : [],
+    connections: visible('connections') ? data.connections : [],
+    explore: visible('explore') ? data.explore : [],
+    jobs: visible('jobs') ? data.jobs : [],
+    events: visible('events') ? data.events : [],
+    communities: visible('communities') ? data.communities : [],
+    pages: visible('pages') ? data.pages : [],
+    settings: visible('settings') ? data.settings : [],
+  };
+}
+
 function makeFeedPost(post: DashboardData['posts'][number]): SocialPost {
   const media = post.image
     ? [
@@ -150,6 +192,7 @@ function mergeDashboardIntoData(
     calls?: SocialAppData['calls'];
     liveStreams?: SocialAppData['liveStreams'];
   },
+  runtimeConfig?: RuntimeConfig,
 ): SocialAppData {
   const explore = dashboard
     ? buildExploreClusters({
@@ -160,7 +203,7 @@ function mergeDashboardIntoData(
       })
     : base.explore;
 
-  return {
+  return applyRuntimeVisibility({
     ...base,
     stories: dashboard?.stories ?? base.stories,
     posts:
@@ -210,42 +253,25 @@ function mergeDashboardIntoData(
     communities: dashboard?.communities ?? base.communities,
     pages: extras?.pages ?? base.pages,
     settings: extras?.settings ?? base.settings,
-  };
+  }, runtimeConfig ?? createEmptyRuntimeConfig());
 }
 
 function includesSearch(haystack: string, needle: string) {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
-function formatChatTimestamp(date = new Date()) {
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
 function withChatDefaults(chat: ChatThread): ChatThread {
-  const starterMessages =
-    chat.messages.length > 0
-      ? chat.messages
-      : [
-          {
-            id: `${chat.id}-starter`,
-            authorId: chat.participant.id,
-            body: `Hi there. I'm active here, so you can send me a message any time.`,
-            createdAt: 'Now',
-            status: 'seen' as const,
-          },
-        ];
-
   return {
     ...chat,
-    online: true,
-    preview: chat.preview || starterMessages[starterMessages.length - 1]?.body || 'Say hello',
-    lastActive: chat.lastActive || 'Now',
-    messages: starterMessages,
+    messages: chat.messages,
   };
 }
 
 export function useSocialApp(): SocialAppState {
   const [session, setSession] = useState<SessionState | null>(() => readSession());
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(() =>
+    createEmptyRuntimeConfig(),
+  );
   const [data, setData] = useState<SocialAppData>(() =>
     createEmptyData(createEmptyViewer()),
   );
@@ -273,12 +299,20 @@ export function useSocialApp(): SocialAppState {
 
     try {
       if (!activeSession?.accessToken) {
+        const nextRuntimeConfig = await fetchRuntimeConfig().catch(() =>
+          createEmptyRuntimeConfig(),
+        );
+        setRuntimeConfig(nextRuntimeConfig);
         setData(baseData);
         setLoadError(null);
         return;
       }
 
-      const viewer = await fetchMe(activeSession.accessToken);
+      const [viewer, nextRuntimeConfig] = await Promise.all([
+        fetchMe(activeSession.accessToken),
+        fetchRuntimeConfig(activeSession.accessToken),
+      ]);
+      setRuntimeConfig(nextRuntimeConfig);
       const nextSession = { ...activeSession, user: viewer };
       setSession(nextSession);
       writeSession(nextSession);
@@ -347,7 +381,7 @@ export function useSocialApp(): SocialAppState {
             liveStreamsResult.status === 'fulfilled'
               ? liveStreamsResult.value
               : undefined,
-        }),
+        }, nextRuntimeConfig),
       );
 
       const failedSlices: string[] = ([
@@ -422,6 +456,11 @@ export function useSocialApp(): SocialAppState {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const isFeatureVisible = useCallback(
+    (featureKey: string) => isRuntimeFeatureVisible(runtimeConfig, featureKey),
+    [runtimeConfig],
+  );
 
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -694,64 +733,12 @@ export function useSocialApp(): SocialAppState {
       return;
     }
 
-    const sentAt = formatChatTimestamp();
-    const sentMessage: ChatMessage = {
-      id: `${chatId}-sent-${Date.now()}`,
-      authorId: session.user.id,
-      body: trimmedMessage,
-      createdAt: sentAt,
-      status: 'sent',
-    };
     const activeThread = dataRef.current.chats.find((chat) => chat.id === chatId);
     const participantName = activeThread?.participant.name || 'there';
-    const participantId = activeThread?.participant.id || '';
 
     try {
       await sendThreadMessageApi(chatId, trimmedMessage, session.accessToken);
-
-      setData((current) => ({
-        ...current,
-        chats: current.chats.map((chat) => {
-          if (chat.id !== chatId) {
-            return chat;
-          }
-
-          return {
-            ...chat,
-            online: true,
-            unreadCount: 0,
-            preview: sentMessage.body,
-            lastActive: sentAt,
-            messages: [...chat.messages, sentMessage],
-          };
-        }),
-      }));
-
-      const replyMessage: ChatMessage = {
-        id: `${chatId}-reply-${Date.now()}`,
-        authorId: participantId,
-        body: `Thanks ${session.user.name || 'friend'}, I saw your message.`,
-        createdAt: formatChatTimestamp(new Date(Date.now() + 60 * 1000)),
-        status: 'seen',
-      };
-
-      window.setTimeout(() => {
-        setData((current) => ({
-          ...current,
-          chats: current.chats.map((chat) =>
-            chat.id === chatId
-              ? {
-                  ...chat,
-                  online: true,
-                  preview: replyMessage.body,
-                  lastActive: 'Now',
-                  messages: [...chat.messages, replyMessage],
-                }
-              : chat,
-          ),
-        }));
-      }, 450);
-
+      await refresh({ silent: true });
       setAuthMessage(`Message sent to ${participantName}.`);
     } catch (error) {
       const errorMessage =
@@ -893,12 +880,14 @@ export function useSocialApp(): SocialAppState {
   return {
     session,
     data: filteredData,
+    runtimeConfig,
     isLoading,
     isRefreshing,
     loadError,
     authMessage,
     searchQuery,
     selectedChatId,
+    isFeatureVisible,
     setSearchQuery,
     refresh,
     login,

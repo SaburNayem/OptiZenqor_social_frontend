@@ -214,6 +214,26 @@ export interface DashboardData {
   stats: DashboardStats;
 }
 
+export interface RuntimeNavigationItem {
+  key: string;
+  label: string;
+  path: string;
+  visible: boolean;
+  requiresAuth: boolean;
+  sortOrder: number;
+  settingKey?: string;
+}
+
+export interface RuntimeConfig {
+  generatedAt: string;
+  web: {
+    navigation: RuntimeNavigationItem[];
+    hiddenRoutes: string[];
+  };
+  appConfig: Array<Record<string, unknown>>;
+  featureFlags: Array<Record<string, unknown>>;
+}
+
 export interface PostMedia {
   id: string;
   type: 'image' | 'video';
@@ -357,12 +377,14 @@ export interface AuthResult {
 export interface SocialAppState {
   session: SessionState | null;
   data: SocialAppData;
+  runtimeConfig: RuntimeConfig;
   isLoading: boolean;
   isRefreshing: boolean;
   loadError: string | null;
   authMessage: string | null;
   searchQuery: string;
   selectedChatId: string;
+  isFeatureVisible: (featureKey: string) => boolean;
   setSearchQuery: (value: string) => void;
   refresh: (options?: { silent?: boolean }) => Promise<void>;
   login: (email: string, password: string) => Promise<AuthResult>;

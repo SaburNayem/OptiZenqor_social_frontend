@@ -1,0 +1,72 @@
+import {
+  AlertTriangle,
+  BellRing,
+  BookOpen,
+  BriefcaseBusiness,
+  CreditCard,
+  Eye,
+  FileWarning,
+  Globe2,
+  Hash,
+  Languages,
+  Link2,
+  LockKeyhole,
+  MonitorSmartphone,
+  RefreshCcw,
+  ShieldCheck,
+  Signal,
+  SlidersHorizontal,
+  UserCog,
+  Vote,
+  WalletCards,
+  XCircle,
+} from 'lucide-react';
+
+export const utilityNavGroups = [
+  {
+    title: 'Privacy & Safety',
+    items: [
+      { to: '/advanced-privacy', label: 'Advanced Privacy', icon: LockKeyhole, featureKey: 'advanced-privacy' },
+      { to: '/safety-privacy', label: 'Safety Privacy', icon: ShieldCheck, featureKey: 'safety-privacy' },
+      { to: '/blocked-users', label: 'Blocked Users', icon: XCircle, featureKey: 'blocked-users' },
+      { to: '/hidden-posts', label: 'Hidden Posts', icon: Eye, featureKey: 'hidden-posts' },
+      { to: '/reports', label: 'Report Center', icon: FileWarning, featureKey: 'report-center' },
+      { to: '/legal', label: 'Legal', icon: AlertTriangle, featureKey: 'legal-compliance' },
+    ],
+  },
+  {
+    title: 'App Setup',
+    items: [
+      { to: '/onboarding', label: 'Onboarding', icon: MonitorSmartphone, featureKey: 'onboarding' },
+      { to: '/personalization', label: 'Personalization', icon: SlidersHorizontal, featureKey: 'personalization-onboarding' },
+      { to: '/accessibility', label: 'Accessibility', icon: Signal, featureKey: 'accessibility-support' },
+      { to: '/localization', label: 'Localization', icon: Languages, featureKey: 'localization-support' },
+      { to: '/push-preferences', label: 'Push Preferences', icon: BellRing, featureKey: 'push-notification-preferences' },
+      { to: '/notification-devices', label: 'Notification Devices', icon: MonitorSmartphone, featureKey: 'notification-devices' },
+    ],
+  },
+  {
+    title: 'Discovery & Content',
+    items: [
+      { to: '/trending', label: 'Trending', icon: Hash, featureKey: 'trending' },
+      { to: '/learning', label: 'Learning', icon: BookOpen, featureKey: 'learning-courses' },
+      { to: '/polls', label: 'Polls', icon: Vote, featureKey: 'polls-surveys' },
+      { to: '/media-viewer', label: 'Media Viewer', icon: Eye, featureKey: 'media-viewer' },
+      { to: '/share-repost', label: 'Share Repost', icon: Link2, featureKey: 'share-repost' },
+      { to: '/explore-recommendations', label: 'Recommendations', icon: Globe2, featureKey: 'explore-recommendation' },
+    ],
+  },
+  {
+    title: 'System & Roles',
+    items: [
+      { to: '/app-update', label: 'App Update', icon: RefreshCcw, featureKey: 'app-update-flow' },
+      { to: '/offline-sync', label: 'Offline Sync', icon: Signal, featureKey: 'offline-sync' },
+      { to: '/maintenance', label: 'Maintenance', icon: AlertTriangle, featureKey: 'maintenance-mode' },
+      { to: '/deep-links', label: 'Deep Links', icon: Link2, featureKey: 'deep-link-handler' },
+      { to: '/business-profile', label: 'Business Profile', icon: BriefcaseBusiness, featureKey: 'business-profile' },
+      { to: '/seller-profile', label: 'Seller Profile', icon: WalletCards, featureKey: 'seller-profile' },
+      { to: '/recruiter-profile', label: 'Recruiter Profile', icon: UserCog, featureKey: 'recruiter-profile' },
+      { to: '/payments', label: 'Payments', icon: CreditCard, featureKey: 'payments' },
+    ],
+  },
+] as const;
